@@ -14,7 +14,7 @@ The analysis uses your Stepmania `Stats.xml` file as well as a scan of your Step
 
 To scan your Stepmania folder use the `getavailablesongs.py` script (usage: `getavailablesongs.py (path to your songs folder)`). After iterating through your song folder for a while, it will generate a CSV file which the data analysis knows to look for and read.
 
-The data analysis is done in a Jupyter notebook. There's a preamble to load in required data, then the code to generate each data table appears in its own section. Run the preamble then run each tables' section one-by-one. Each section is structured to write the data to your clipboard, which you can then paste into Excel or Google Sheets or wherever you want.
+The data analysis is done in a Jupyter notebook (after installing Jupyter, run `jupyter notebook`). There's a preamble to load in required data, then the code to generate each data table appears in its own section. Run the preamble then run each tables' section one-by-one. Each section is structured to write the data to your clipboard, which you can then paste into Excel or Google Sheets or wherever you want.
 
 ## Available statistics
 
