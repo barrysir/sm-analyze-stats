@@ -1,6 +1,6 @@
 # sm-analyze-stats
 
-Scripts to analyze a given Stepmania Stats.xml file for stats (most played songs, leaderboards, etc.)
+Simple script to analyze the saved statistics of a Stepmania instance (Stats.xml, Upload folder) and report statistics in an Excel spreadsheet. (This can then be imported into Google Sheets or wherever.)
 
 You can run this code but I don't really expect people to run it for themselves, it's more for people to look at and steal/reuse for their own analysis needs :) 
 

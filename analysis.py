@@ -11,277 +11,53 @@ import numpy as np
 import datetime as dt
 from dataclasses import dataclass
 
-class TableStatsConstructing:
-    """Mixin for TableStats to hold data parsing functions. (Bad programming practice?)"""
-    def fill_stats_xml(self, path_to_stats: Path, packs_to_ignore: Set[str] = set(), track_usb_customs: bool = False, track_slowed_down_plays: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """
-        Generate useful tables from contents of Stats.xml.
-
-        Includes some options to control output data:
-            packs_to_ignore: A set of pack names to ignore.
-            track_usb_customs: Whether to include USB customs in the data.
-                If true, USB customs are stored in a pack named '@mem'.
-            track_slowed_down_plays: Whether to include downrated plays in the leaderboard.
-                Cop-out flag made for myself to parse out downrated scores as my arcade used to record scores for downrates.
-
-                TODO: might be better to clean this up in the stats file itself.
-                    create a remove_ratemodded_scores() function
-        
-        Returns 2 datatables:
-        (1) playstats - Playcount and last played date for every chart.
-            index:
-                (key, steptype, difficulty)
-            columns: 
-                playcount (int > 0)
-                lastplayed (pd.Timestamp)
-            NOTE: this only records songs that have been played at least once.
-        (2) leaderboards - Leaderboards (place, player name and score) for every chart.
-            index: (key, steptype, difficulty, place)
-            columns:
-                player (4-character str)
-                score (float) - ranging from 0 to 1, so 0.9900 -> 99.00
-        """
-        stats_xml = ET.parse(path_to_stats)
-        root = stats_xml.getroot()
-        songscores = root.find('SongScores')
-
-        playdata = []
-        leaderboards = []
-        for song in songscores:
-            songdir = song.get('Dir')   # e.g. 'Songs/DDR A/DANCE ALL NIGHT (DDR EDITION)/'
-            
-            # deal with AdditionalSongs paths: normalize them to `pack/song/`
-            # (packs from AdditionalSongFolders will show as `AdditionalSongs/pack/song/` instead of `pack/song/`)
-            # solution(?): take only the last two segments of the path
-            # not sure if AdditionalSongs is the only case this will happen,
-            # but hopefully this handles anything else that might show up?
-            parts = songdir.strip('/').split('/')
-            *_, pack, songname = parts
-            songdir = f'{pack}/{songname}/'
-            
-            # ignore any specified packs
-            if pack in packs_to_ignore:
-                continue
-            
-            # iterate over every (played) chart in the song
-            editcount = 0
-            for steps in song.findall('Steps'):
-                # grab chart identifiers: steptype and difficulty
-                steptype = steps.get('StepsType')   # dance-single, dance-double, ...
-                difficulty = steps.get('Difficulty')    # Beginner, Easy, Medium, Hard, Challenge, Edit, ...
-                # if there are multiple edits, give them unique names to make processing easier, "Edit", "Edit-1", "Edit-2", etc.
-                if difficulty == 'Edit':
-                    if editcount >= 1:
-                        difficulty = f'{difficulty}-{editcount}'
-                    editcount += 1
-                    
-                # grab playdata info
-                numplayed = int(steps.find('HighScoreList/NumTimesPlayed').text)
-                lastplayed = pd.Timestamp(steps.find('HighScoreList/LastPlayed').text)
-                playdata.append((songdir, steptype, difficulty, numplayed, lastplayed))
-                
-                # grab leaderboard info
-                # ignore USB customs, if flag specified
-                if pack != '@mem' or track_usb_customs:
-                    chart_lb = []
-                    for score in steps.find('HighScoreList').findall('HighScore'):
-                        # don't include any scores on slower ratemods, if flag specified
-                        if not track_slowed_down_plays:
-                            modifiers = score.find('Modifiers').text
-                            if 'xMusic' in modifiers:
-                                mods = modifiers.split(',')
-                                ratemod = next(i for i in mods if 'xMusic' in i)
-                                ratemod = ratemod.strip().replace('xMusic', '')
-                                ratemod = float(ratemod)
-                                if ratemod < 1:
-                                    continue
-                                
-                        chart_lb.append((score.find('Name').text, float(score.find('PercentDP').text)))
-
-                    chart_lb.sort(key=lambda x: x[1], reverse=True)
-                    for i,(name, dp) in enumerate(chart_lb):
-                        leaderboards.append((songdir, steptype, difficulty, i+1, name, dp))
-
-        df_playdata = pd.DataFrame(playdata, columns=['key', 'steptype', 'difficulty', 'playcount', 'lastplayed'])
-        df_playdata = df_playdata.set_index(['key', 'steptype', 'difficulty'])
-
-        df_leaderboards = pd.DataFrame(leaderboards, columns=['key', 'steptype', 'difficulty', 'place', 'player', 'score'])
-        df_leaderboards = df_leaderboards.set_index(['key', 'steptype', 'difficulty'])
-
-        self.playedsongs = df_playdata
-        self.highscores = df_leaderboards
-       
-    def fill_song_listing(self, path_to_csv: Path, packs_to_ignore: Set[str] = set()) -> pd.DataFrame:
-        def loadfromcsv(path):
-            with open(path, newline='', encoding='utf8') as csvfile:
-                reader = csv.reader(csvfile, delimiter=',', quotechar='"')
-                return [row for row in reader]
-            
-        try:
-            availablesongs = loadfromcsv(path_to_csv)
-        except FileNotFoundError:
-            print(f"Error: couldn't load {path_to_csv}. Report data may be incomplete")
-            availablesongs = []
-            
-        data = []
-        encountered = Counter()
-        for row in availablesongs:
-            # implement IGNORED_PACKS list
-            pack,songname = row[0].strip('/').split('/')
-            if pack in packs_to_ignore:
-                continue
-            
-            # if a duplicate difficulty is encountered, name it "Edit", "Edit-1", Edit-2", ...
-            key = (row[0], row[2], row[3])
-            if key in encountered:
-                row[3] = f'{row[3]}-{encountered[key]}'
-            row[4] = int(row[4])
-            encountered[key] += 1
-            data.append(row)
-
-        df_availablesongs = pd.DataFrame(data, columns=['key', 'song', 'steptype', 'difficulty', 'meter'])
-        df_availablesongs = df_availablesongs.set_index(['key', 'steptype', 'difficulty'])
-
-        self.availablesongs = df_availablesongs
-    
-@dataclass
-class TableStats(TableStatsConstructing):
-    """Plain data structure to hold raw and processed data tables for queries to use."""
-
-    # data from Save/Stats.xml
-    playedsongs: Optional[pd.DataFrame] = None
-    highscores: Optional[pd.DataFrame] = None
-
-    # data from Save/Upload folder
-    uploaddata: Optional[pd.DataFrame] = None
-
-    # data from Songs folder
-    availablesongs: Optional[pd.DataFrame] = None
-
-    # Lookup table from song key -> pack name and song title.
-    # packinfo: Optional[pd.DataFrame] = None
-
-    # Lookup table mapping (song key, steptype, difficulty) -> shorthand text of the chart: "Bloodrush SX12", "Disconnected Disco DX10".
-    # song_shorthand: Optional[pd.DataFrame]
-
-    @cached_property
-    def song_shorthand(self):
-        steptypes = {'dance-single': 'S', 'dance-double': 'D'}
-        steptypes_full = {'dance-single': 'Single', 'dance-double': 'Double'}
-        difficulties = {'Beginner': 'B', 'Easy': 'E', 'Medium': 'M', 'Hard': 'H', 'Challenge': 'X', 'Edit': 'Z'}
-
-        def shorthand(row):
-            # SB, SE, SM, SH, SX
-            # (song name) SX10
-            # idea (not implemented): display edit name? (song name) SZ69 iunno
-            steptype = row.name[1]
-            diff = row.name[2].partition('-')[0]
-            s = steptypes.get(steptype, None)
-            d = difficulties.get(diff, None)
-            if s is None or d is None:
-                return None
-            sfull = steptypes_full.get(steptype, None)
-            meter = '' if pd.isna(row.meter) else int(row.meter)
-            dtag = f'{s}{d}{meter}'
-            return (f'{row.song} {dtag}', dtag, sfull)
-
-        song_shorthand = self.combined.apply(shorthand, axis=1, result_type='expand')
-        song_shorthand = song_shorthand.rename(columns=dict(enumerate(['shorthand', 'dtag', 'stepfull'])))
-        return song_shorthand
-
-    @cached_property
-    def combined(self):
-        assert self.playedsongs is not None
-        assert self.availablesongs is not None
-
-        # Add entries for songs in availablesongs but not playedsongs.
-        # Entry rows filled with 0 playcount and N/A last played.
-        combined = self.playedsongs.combine_first(self.availablesongs)
-        combined['playcount'] = combined['playcount'].fillna(0).astype(int)
-
-        # sort index for aesthetics (e.g. difficulties show up in Easy, Medium, Hard, Challenge order)
-        def pdict(arr):
-            return {v:k for k,v in enumerate(arr)}
-
-        MODE = pdict(['dance-single', 'dance-double', 'pump-single', 'pump-double'])
-        DIFFS = pdict(['Beginner', 'Easy', 'Medium', 'Hard', 'Challenge'])
-
-        def sorter_difficulty_spread(s):
-            if s.name == 'steptype':
-                return s.map(lambda x: MODE.get(x, len(MODE)))
-            elif s.name == 'difficulty':
-                return s.map(lambda x: DIFFS.get(x, len(DIFFS)))
-            return s
-
-        combined = combined.sort_index(key=sorter_difficulty_spread)
-
-        # compute pack name and song name for each row
-        def split_key(k):
-            parts = k.strip('/').split('/')
-            pack, *_, inferred_songname = parts
-            return (pack, inferred_songname)
-            
-        # Compute pack name and inferred song name for each key
-        # Inferred song name will be used whenever song name is empty
-        s = combined.index.get_level_values('key').to_series().drop_duplicates().map(split_key)
-        # convert a series of tuples to a dataframe
-        s = pd.DataFrame(s.tolist(), columns=['pack', 'song'], index=s.index)
-        # update the index to be the same as combined
-        v = s.join(pd.DataFrame(index=combined.index))  # update by joining on empty dataframe with index
-        # Fill any empty song names with the inferred song name
-        v['song'] = combined['song'].combine_first(v['song'])
-        # update combined with the computed results
-        combined = combined.assign(pack=v['pack'], song=v['song'])
-
-        # store the songname column for later, when calculating the pack_info dataframe
-        # drop it from the combined frame cause I don't want the data in this location
-        # songnames = combined['songname']
-        # combined = combined.drop(columns=['songname'])
-
-        # def inner_loop(row):
-        #     k = row.name[0]
-        #     parts = k.strip('/').split('/')
-        #     pack, *_, inferred_songname = parts
-        #     # if songname data doesn't exist, fall back to inferring the song name as the folder name
-        #     songname = row.songname
-        #     if row.songname is None:
-        #         songname = inferred_songname
-        #     return (pack, songname)
-        
-        # pack_info = combined.apply(inner_loop, axis=1, result_type='expand').rename(columns=dict(enumerate(['pack', 'song'])))
-        # pack_info
-
-        # # compute packinfo
-        # data = []
-        # for k,songname in songnames.groupby('key').first().items():
-
-        # self.packinfo = pd.DataFrame(data, columns=['key', 'pack', 'song']).set_index(['key'])
-
-        # There can be songs that have been played but aren't available anymore, e.g. removed packs, USB customs.
-        # Leaving these in the combined table can mess up certain queries like chart count and pack completion.
-        # Here we'll leave only songs that are available.
-        # Note that this also removes the @mem pack
-        # TODO: this should be specified within queries, probably
-        
-        return combined
-
-    def song_data(self, keep_unavailable: bool = True, with_mem: bool = False):
-        df = self.combined
-        if not with_mem:
-            df = df[df.pack != '@mem']
-        if not keep_unavailable:
-            df = df[df.index.isin(self.availablesongs.index)]
-        return df
-
 def strip_prefix(string: str, prefix: str) -> str:
     if string.startswith(prefix):
         return string[len(prefix):]
     return string
 
+def pack_ordering(s):
+    return s.str.lower()
+
 # Note - it can be tempting to get the packname and song by splitting the key.
 #     The pack name will be correct but the song name will be subtly wrong because it returns
 #     the name of the folder and not the song title itself!
 #     TO get the proper song name, you'll have to look at availablesongs (TODO write this better)
+
+def chart_counts_for_each_pack(stats: TableStats, modes: dict[str, str]):
+    data = stats.song_data(with_mem = False, keep_unavailable = False)
+
+    def group_by_songs(df):
+        return df[~df.index.get_level_values('key').duplicated()]
+
+    def songs_and_charts(v: pd.DataFrame, column_prefix=''):
+        if column_prefix != '':
+            column_prefix = f'{column_prefix}_'    
+        total_charts = v.groupby('pack').size().rename(f'{column_prefix}charts')
+        total_songs = group_by_songs(v).groupby('pack').size().rename(f'{column_prefix}songs')
+        return total_songs, total_charts
+
+    # note: there might be other chart types, like pump-single, pump-double, or weird ones like lights-cabinet
+    # to avoid counting unplayable stuff, we'll filter "total charts" to only the requested modes
+    total = songs_and_charts(data.loc[pd.IndexSlice[:, modes.keys(), :]])
+    per_steptype = []
+    for steptype,label in modes.items():
+        columns = songs_and_charts(data.loc[pd.IndexSlice[:, [steptype], :]], label)
+        per_steptype.extend(columns)
+
+    v = pd.concat([*total, *per_steptype], axis=1).fillna(0).sort_index(key=pack_ordering)
+    return v
+
+def pack_difficulty_histogram(stats: TableStats, upper_limit: int = 27):
+    normal = data[data.meter.fillna(0) < upper_limit].groupby(['pack', 'meter']).size().to_frame()
+    above = (
+        data[data.meter >= upper_limit].groupby(['pack']).size().to_frame()
+        .assign(meter=upper_limit).set_index('meter', append=True)
+    )
+    total = normal.combine_first(above)
+    normalized = total / total.groupby('pack').max()
+    histogram = normalized.unstack().sort_index(key=pack_ordering)
+    return histogram
 
 def most_played_charts(stats: TableStats):
     most_played_charts = stats.song_data(with_mem = False, keep_unavailable = True).sort_values('playcount', ascending=False).head(50)
@@ -331,6 +107,18 @@ def recently_played_packs(stats: TableStats):
     v = last_played_packs.reset_index()
     return v
 
+import openpyxl
+from openpyxl import Workbook, load_workbook
+from openpyxl.cell import Cell
+from openpyxl.comments import Comment
+from openpyxl.styles import Alignment, Fill, PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
+def create_general_sheet(ws: Worksheet):
+    
+    pass
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog='analysis.py',
@@ -352,8 +140,22 @@ if __name__ == "__main__":
 
     # I'm goig to have
     #   a script which outputs every data table (as csvs? json?)
-    #       a single javascript renderer? (drag in a data file: tabs, simple table rendering)
-    #   a notebook where you can compute each table individually.
+    #       a simple javascript renderer? (drag in a data file: tabs, simple table rendering)
+    #       AND a sample google sheets where you can paste in the tables
+    #
+    #       the javascript renderer is because it takes no work. google sheets requires copy pasting multiple times.
+    #       tables could be dynamic size (difficulty histogram)
+    #           TODO: make difficulty histogram have a lower end too?
+    #                 make it have a step besides 1
+    #                 this is getting too wide... just keep it simple
+    #
+    #       could export to excel, and import into google sheets
+    #       making excel spreadsheets is really clunky though...
+    #           but it would be equally as hard in javascript
+    #           can copy paste data from excel into google sheets
+
+    #   a notebook where you can compute each table individually
+    #   
 
     # tree = ET.parse('Stats.xml')
     # root = tree.getroot()
