@@ -36,9 +36,9 @@ def pack_difficulty_histogram(stats: TableStats, upper_limit: int = 27):
     # maybe there's a way to do this without stacking and unstacking so much, idk
     normal = valid[valid.meter < upper_limit].groupby(['pack', 'meter']).size().unstack().rename(columns=lambda s: str(int(s)))
     above = valid[valid.meter >= upper_limit].groupby(['pack']).size().rename('27+')
-    invalidcol = invalid.groupby(['pack']).size().rename('Invalid')
+    unknown = invalid.groupby(['pack']).size().rename('?')
     
     # normalize 
-    total = pd.concat([normal, above, invalidcol], axis=1)
+    total = pd.concat([normal, above, unknown], axis=1)
     histogram = (total.stack() / total.max(axis='columns')).unstack()
     return histogram

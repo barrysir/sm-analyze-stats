@@ -117,6 +117,10 @@ def write_table(df, cell: Cell, index=False, header=False):
     for dr,row in enumerate(dataframe_to_rows(df, index=index, header=header)):
         for dc,value in enumerate(row):
             cell.offset(dr,dc).value = value
+        
+def write_row(row: list, cell: Cell):
+    for dc,value in enumerate(row):
+        cell.offset(0,dc).value = value
 
 from openpyxl.worksheet.dimensions import ColumnDimension, DimensionHolder
 def find_column(dims: DimensionHolder, col: int):
@@ -134,44 +138,16 @@ def create_general_sheet(ws: Worksheet, stats: TableStats, modes = None):
     if modes is None:
         modes = {'dance-single': 'Singles', 'dance-double': 'Doubles'}
     
-    # make song/chart count for each mode
-    TEMPLATE_RANGE = CellRange("D1:E1")
-    for i,label in enumerate(modes.values()):
-        dest_col = TEMPLATE_RANGE.min_col + i*2
-        # copy template
-        if i != 0:
-            ws.insert_cols(dest_col, 2)
-            copy_columns(ws, TEMPLATE_RANGE, dest_col)
-        # change header title
-        ws.cell(1, dest_col).value = label
-    HISTOGRAM_CELL = ws.cell(3, TEMPLATE_RANGE.min_col + len(modes)*2)
-    
     a = analyzers.chart_counts_for_each_pack(stats, modes)
     write_table(a.reset_index(), ws['A4'])
 
-    # todo: set pack count / song and chart totals
+    ws['A3'].value = len(a)             # set pack count
+    write_row(list(a.sum()), ws['B3'])  # set song and chart totals for each mode
 
     # render difficulty histogram
     # todo: make sure both tables display packs in the right order
     a = analyzers.pack_difficulty_histogram(stats)
-    HISTOGRAM_RANGE = CellRange(
-        None, 
-        HISTOGRAM_CELL.col_idx, HISTOGRAM_CELL.row,
-        HISTOGRAM_CELL.col_idx + len(a.columns), HISTOGRAM_CELL.row + len(a)
-    )
-    print(HISTOGRAM_CELL)
-    print(HISTOGRAM_RANGE)
-    write_table(a.reset_index().drop('pack', axis='columns'), HISTOGRAM_CELL, header=True)
-
-    col = find_column(ws.column_dimensions, 7)
-    col.min = HISTOGRAM_RANGE.min_col
-    col.max = HISTOGRAM_RANGE.max_col
-
-    ws.conditional_formatting
-    # HISTOGRAM_WIDTH = ws.column_dimensions[get_column_letter(HISTOGRAM_RANGE.min_col)].width
-    # for c in range(HISTOGRAM_RANGE.min_col, HISTOGRAM_RANGE.max_col+1):
-    #     # ws.column_dimensions[get_column_letter(c)].width = HISTOGRAM_WIDTH
-    #     ws.column_dimensions[get_column_letter(c)] = ColumnDimension(ws, width=HISTOGRAM_WIDTH)
+    write_table(a.reset_index().drop('pack', axis='columns'), ws['H3'], header=True)
 
 
 
