@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 from dataclasses import dataclass
+from table_stats import TableStats
 
 def strip_prefix(string: str, prefix: str) -> str:
     if string.startswith(prefix):
@@ -23,41 +24,6 @@ def pack_ordering(s):
 #     The pack name will be correct but the song name will be subtly wrong because it returns
 #     the name of the folder and not the song title itself!
 #     TO get the proper song name, you'll have to look at availablesongs (TODO write this better)
-
-def chart_counts_for_each_pack(stats: TableStats, modes: dict[str, str]):
-    data = stats.song_data(with_mem = False, keep_unavailable = False)
-
-    def group_by_songs(df):
-        return df[~df.index.get_level_values('key').duplicated()]
-
-    def songs_and_charts(v: pd.DataFrame, column_prefix=''):
-        if column_prefix != '':
-            column_prefix = f'{column_prefix}_'    
-        total_charts = v.groupby('pack').size().rename(f'{column_prefix}charts')
-        total_songs = group_by_songs(v).groupby('pack').size().rename(f'{column_prefix}songs')
-        return total_songs, total_charts
-
-    # note: there might be other chart types, like pump-single, pump-double, or weird ones like lights-cabinet
-    # to avoid counting unplayable stuff, we'll filter "total charts" to only the requested modes
-    total = songs_and_charts(data.loc[pd.IndexSlice[:, modes.keys(), :]])
-    per_steptype = []
-    for steptype,label in modes.items():
-        columns = songs_and_charts(data.loc[pd.IndexSlice[:, [steptype], :]], label)
-        per_steptype.extend(columns)
-
-    v = pd.concat([*total, *per_steptype], axis=1).fillna(0).sort_index(key=pack_ordering)
-    return v
-
-def pack_difficulty_histogram(stats: TableStats, upper_limit: int = 27):
-    normal = data[data.meter.fillna(0) < upper_limit].groupby(['pack', 'meter']).size().to_frame()
-    above = (
-        data[data.meter >= upper_limit].groupby(['pack']).size().to_frame()
-        .assign(meter=upper_limit).set_index('meter', append=True)
-    )
-    total = normal.combine_first(above)
-    normalized = total / total.groupby('pack').max()
-    histogram = normalized.unstack().sort_index(key=pack_ordering)
-    return histogram
 
 def most_played_charts(stats: TableStats):
     most_played_charts = stats.song_data(with_mem = False, keep_unavailable = True).sort_values('playcount', ascending=False).head(50)
@@ -112,12 +78,102 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.cell import Cell
 from openpyxl.comments import Comment
 from openpyxl.styles import Alignment, Fill, PatternFill
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import get_column_letter, column_index_from_string
 from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.worksheet.cell_range import CellRange
+import copy
 
-def create_general_sheet(ws: Worksheet):
+def letter_to_index(c):
+    if isinstance(c, str):
+        return column_index_from_string(c)
+    return c
+
+def copy_columns(ws, column_range, dest_column):
+    dest_column = letter_to_index(dest_column)
     
-    pass
+    # copy cell data and formatting
+    for column in ws.iter_cols(column_range.min_col, column_range.max_col):
+        for cell in column:
+            new_cell = ws.cell(row=cell.row, column=dest_column + (cell.column - column_range.min_col), value=cell.value)
+            if cell.has_style:
+                new_cell.font = copy.copy(cell.font)
+                new_cell.border = copy.copy(cell.border)
+                new_cell.fill = copy.copy(cell.fill)
+                new_cell.number_format = copy.copy(cell.number_format)
+                new_cell.protection = copy.copy(cell.protection)
+                new_cell.alignment = copy.copy(cell.alignment)
+    
+    # copy merged cells
+    for mcr in set(ws.merged_cells.ranges):
+        if not(column_range.min_col <= mcr.min_col <= column_range.max_col):
+            continue
+        cr = CellRange(mcr.coord)
+        cr.shift(col_shift=dest_column - column_range.min_col)
+        ws.merge_cells(cr.coord)
+
+from openpyxl.utils.dataframe import dataframe_to_rows
+
+def write_table(df, cell: Cell, index=False, header=False):
+    for dr,row in enumerate(dataframe_to_rows(df, index=index, header=header)):
+        for dc,value in enumerate(row):
+            cell.offset(dr,dc).value = value
+
+from openpyxl.worksheet.dimensions import ColumnDimension, DimensionHolder
+def find_column(dims: DimensionHolder, col: int):
+    for dim in dims.values():
+        if dim.min <= col <= dim.max:
+            return dim
+
+import analyzers
+
+class DimensionSetter:
+    def create_columns(self, cell_range) :
+        pass
+
+def create_general_sheet(ws: Worksheet, stats: TableStats, modes = None):
+    if modes is None:
+        modes = {'dance-single': 'Singles', 'dance-double': 'Doubles'}
+    
+    # make song/chart count for each mode
+    TEMPLATE_RANGE = CellRange("D1:E1")
+    for i,label in enumerate(modes.values()):
+        dest_col = TEMPLATE_RANGE.min_col + i*2
+        # copy template
+        if i != 0:
+            ws.insert_cols(dest_col, 2)
+            copy_columns(ws, TEMPLATE_RANGE, dest_col)
+        # change header title
+        ws.cell(1, dest_col).value = label
+    HISTOGRAM_CELL = ws.cell(3, TEMPLATE_RANGE.min_col + len(modes)*2)
+    
+    a = analyzers.chart_counts_for_each_pack(stats, modes)
+    write_table(a.reset_index(), ws['A4'])
+
+    # todo: set pack count / song and chart totals
+
+    # render difficulty histogram
+    # todo: make sure both tables display packs in the right order
+    a = analyzers.pack_difficulty_histogram(stats)
+    HISTOGRAM_RANGE = CellRange(
+        None, 
+        HISTOGRAM_CELL.col_idx, HISTOGRAM_CELL.row,
+        HISTOGRAM_CELL.col_idx + len(a.columns), HISTOGRAM_CELL.row + len(a)
+    )
+    print(HISTOGRAM_CELL)
+    print(HISTOGRAM_RANGE)
+    write_table(a.reset_index().drop('pack', axis='columns'), HISTOGRAM_CELL, header=True)
+
+    col = find_column(ws.column_dimensions, 7)
+    col.min = HISTOGRAM_RANGE.min_col
+    col.max = HISTOGRAM_RANGE.max_col
+
+    ws.conditional_formatting
+    # HISTOGRAM_WIDTH = ws.column_dimensions[get_column_letter(HISTOGRAM_RANGE.min_col)].width
+    # for c in range(HISTOGRAM_RANGE.min_col, HISTOGRAM_RANGE.max_col+1):
+    #     # ws.column_dimensions[get_column_letter(c)].width = HISTOGRAM_WIDTH
+    #     ws.column_dimensions[get_column_letter(c)] = ColumnDimension(ws, width=HISTOGRAM_WIDTH)
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
