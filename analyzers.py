@@ -1,3 +1,4 @@
+from typing import Optional
 from table_stats import TableStats
 import pandas as pd
 
@@ -42,3 +43,18 @@ def pack_difficulty_histogram(stats: TableStats, upper_limit: int = 27):
     total = pd.concat([normal, above, unknown], axis=1)
     histogram = (total.stack() / total.max(axis='columns')).unstack()
     return histogram
+
+def most_played_charts(stats: TableStats, limit: int = 50, modes: Optional[list] = None):
+    data = stats.song_data(with_mem = False, keep_unavailable = True)
+    if modes:
+        data = data.loc[pd.IndexSlice[:, modes, :]]
+    most_played_charts = data.sort_values('playcount', ascending=False).head(limit)
+    
+    # Pack / Song / Steptype (Singles / Doubles) / Difficulty (Expert) / Meter (9) / Playcount / Last played
+    a = (
+        most_played_charts
+        .join(stats.song_shorthand)
+        .reset_index(level='difficulty')
+        [['pack', 'song', 'stepfull', 'difficulty', 'meter', 'playcount', 'lastplayed']]
+    )
+    return a

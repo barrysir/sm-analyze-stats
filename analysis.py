@@ -25,17 +25,6 @@ def pack_ordering(s):
 #     the name of the folder and not the song title itself!
 #     TO get the proper song name, you'll have to look at availablesongs (TODO write this better)
 
-def most_played_charts(stats: TableStats):
-    most_played_charts = stats.song_data(with_mem = False, keep_unavailable = True).sort_values('playcount', ascending=False).head(50)
-    
-    # Pack / Song / Steptype (Singles / Doubles) / Difficulty (Expert) / Meter (9) / Playcount / Last played
-    a = (
-        most_played_charts
-        .join(stats.song_shorthand)
-        .reset_index(level='difficulty')
-        [['pack', 'song', 'stepfull', 'difficulty', 'meter', 'playcount', 'lastplayed']]
-    )
-    return a
 
 def most_played_packs(stats: TableStats, N: int = 10):
     v = stats.song_data(with_mem=False, keep_unavailable=True)
@@ -149,6 +138,14 @@ def create_general_sheet(ws: Worksheet, stats: TableStats, modes = None):
     a = analyzers.pack_difficulty_histogram(stats)
     write_table(a.reset_index().drop('pack', axis='columns'), ws['H3'], header=True)
 
+def create_most_played_charts_sheet(ws: Worksheet, stats: TableStats, limit: int = 50):
+    all_songs = analyzers.most_played_charts(stats, limit)
+    doubles_only = analyzers.most_played_charts(stats, limit, modes=['dance-double'])
+
+    write_table(all_songs, ws['A3'])
+    write_table(doubles_only, ws['I3'])
+
+    # todo: set background colour for extra song entries?
 
 
 if __name__ == "__main__":
