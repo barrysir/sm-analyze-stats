@@ -274,3 +274,7 @@ class TableStats(TableStatsConstructing):
         if not keep_unavailable:
             df = df[df.index.isin(self.availablesongs.index)]
         return df
+
+    @cached_property
+    def pack_info(self):
+        return self.combined.groupby('key').nth(0).reset_index(level=[1,2])[['pack', 'song']]

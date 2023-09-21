@@ -58,3 +58,56 @@ def most_played_charts(stats: TableStats, limit: int = 50, modes: Optional[list]
         [['pack', 'song', 'stepfull', 'difficulty', 'meter', 'playcount', 'lastplayed']]
     )
     return a
+
+def pdict(arr):
+    return {v:k for k,v in enumerate(arr)}
+
+MODE = pdict(['dance-single', 'dance-double', 'pump-single', 'pump-double'])
+DIFFS = pdict(['Beginner', 'Easy', 'Medium', 'Hard', 'Challenge'])
+
+def sorter_difficulty_spread(s):
+    if s.name == 'steptype':
+        return s.map(lambda x: MODE.get(x, len(MODE)))
+    elif s.name == 'difficulty':
+        return s.map(lambda x: DIFFS.get(x, len(DIFFS)))
+    return s
+
+def most_played_songs(stats: TableStats, limit: int = 50, modes: Optional[list] = None):
+    combined = stats.song_data(with_mem = False, keep_unavailable = True)
+    if modes:
+        combined = combined.loc[pd.IndexSlice[:, modes, :]]
+
+    # get list of songs with most plays on them
+    playcount_sum = (
+        combined.groupby(level="key")
+        .agg({'playcount': 'sum', 'lastplayed': 'max'})
+        .rename(columns={'playcount': 'total'})
+        .sort_values('total', ascending=False)
+        .head(50)
+    )
+
+    # add pack and song name info, reorder columns so pack/song comes first
+    playcount_sum = playcount_sum.join(stats.pack_info)[['pack', 'song', 'total', 'lastplayed']]
+
+    # now generate the playcount breakdown for the difficulty spread
+    # creates columns (dance-single, Beginner), (dance-single, Easy), ... for each played charts
+    playcount_breakdown = (
+        combined.loc[playcount_sum.index.values, 'playcount']
+        .unstack(level=[1, 2])  # move stepstype,difficulty to columns
+    )
+
+    # some columns might be missing
+    # make sure each difficulty has a BEMHX difficulty spread
+    for mode in playcount_breakdown.columns.get_level_values(0).unique().to_list():
+        for diff in ['Beginner', 'Easy', 'Medium', 'Hard', 'Challenge', 'Edit']:
+            if (mode, diff) not in playcount_breakdown.columns:
+                playcount_breakdown[(mode, diff)] = float('nan')
+    
+    # order columns in BEHMX order
+    playcount_breakdown = playcount_breakdown.sort_index(key=sorter_difficulty_spread, axis=1)
+
+    # join the tables together
+    playcount_sum.columns = pd.MultiIndex.from_product([playcount_sum.columns, ['']])
+    playcount_breakdown = playcount_sum.join(playcount_breakdown)
+    
+    return playcount_breakdown

@@ -147,6 +147,16 @@ def create_most_played_charts_sheet(ws: Worksheet, stats: TableStats, limit: int
 
     # todo: set background colour for extra song entries?
 
+def create_most_played_songs_sheet(ws: Worksheet, stats: TableStats, limit: int = 50):
+    all_songs = analyzers.most_played_songs(stats, limit)
+    doubles_only = analyzers.most_played_songs(stats, limit, modes=['dance-double'])
+
+    write_table(all_songs, ws['A3'])
+    write_table(doubles_only, ws['A57'])
+
+    # todo: set background colour for extra song entries?
+    # todo: doesn't work for limits > 50, decide what to do
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
