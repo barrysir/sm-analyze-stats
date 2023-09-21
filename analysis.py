@@ -26,30 +26,6 @@ def pack_ordering(s):
 #     TO get the proper song name, you'll have to look at availablesongs (TODO write this better)
 
 
-def most_played_packs(stats: TableStats, N: int = 10):
-    v = stats.song_data(with_mem=False, keep_unavailable=True)
-
-    # calculate the most played packs
-    most_played_packs = (
-        v.groupby('pack')
-        .agg({'playcount': 'sum', 'lastplayed': 'max'})
-        .sort_values(by='playcount', ascending=False)
-    )
-
-    # calculate the N most played charts per pack
-    place = v.sort_values('playcount', ascending=False).groupby('pack').cumcount() + 1
-    x = v.assign(place=place)
-    x = x[x.place <= N].join(stats.song_shorthand)
-    y = x.reset_index().set_index(['pack', 'place'])
-
-    most_played_songs_in_pack = (
-        y[['shorthand', 'playcount']]
-        .apply(lambda row: "({playcount}) {shorthand}".format(**row), axis=1)
-        .unstack('place')
-    )
-
-    s = most_played_packs.join(most_played_songs_in_pack).reset_index()
-    return s
 
 
 def recently_played_packs(stats: TableStats):
@@ -156,6 +132,13 @@ def create_most_played_songs_sheet(ws: Worksheet, stats: TableStats, limit: int 
 
     # todo: set background colour for extra song entries?
     # todo: doesn't work for limits > 50, decide what to do
+
+def create_most_played_packs_sheet(ws: Worksheet, stats: TableStats):
+    packs_by_playcount = analyzers.most_played_packs(stats)
+    song_breakdown = analyzers.most_played_charts_per_pack(stats)
+    
+    final_table = packs_by_playcount.join(song_breakdown)
+    write_table(final_table.reset_index(), ws['A2'])
 
 
 if __name__ == "__main__":

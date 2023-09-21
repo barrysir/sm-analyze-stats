@@ -111,3 +111,37 @@ def most_played_songs(stats: TableStats, limit: int = 50, modes: Optional[list] 
     playcount_breakdown = playcount_sum.join(playcount_breakdown)
     
     return playcount_breakdown
+
+
+def most_played_packs(stats: TableStats):
+    v = stats.song_data(with_mem=False, keep_unavailable=True)
+    most_played_packs = (
+        v.groupby('pack')
+        .agg({'playcount': 'sum', 'lastplayed': 'max'})
+        .sort_values(by='playcount', ascending=False)
+    )
+    return most_played_packs
+
+def most_played_charts_per_pack(stats: TableStats, N: int = 10):
+    v = stats.song_data(with_mem=False, keep_unavailable=True)
+
+    # don't list any songs with 0 playcount, have a blank spot instead
+    v = v[v.playcount > 0]
+
+    # give each chart a place within its pack and only keep top N
+    place = v.sort_values('playcount', ascending=False).groupby('pack').cumcount() + 1
+    x = v.assign(place=place)
+    x = x[x.place <= N]
+    
+    # join song shorthand
+    x = x.join(stats.song_shorthand)
+    
+    # there's a lot of columns going around, rearrange the table and crop only the ones we need
+    x = x.reset_index().set_index(['pack', 'place'])[['shorthand', 'playcount']]
+    
+    # render short text for each entry
+    x = x.apply(lambda row: "({playcount}) {shorthand}".format(**row), axis=1)
+    
+    # move place into the columns
+    x = x.unstack('place')
+    return x
