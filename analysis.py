@@ -25,19 +25,6 @@ def pack_ordering(s):
 #     the name of the folder and not the song title itself!
 #     TO get the proper song name, you'll have to look at availablesongs (TODO write this better)
 
-
-
-
-def recently_played_packs(stats: TableStats):
-    last_played_packs = (
-        stats.song_data(with_mem=False, keep_unavailable=True)
-        .groupby('pack')
-        .agg({'lastplayed': 'max'})
-        .sort_values(by='lastplayed', ascending=False)
-    )
-    v = last_played_packs.reset_index()
-    return v
-
 import openpyxl
 from openpyxl import Workbook, load_workbook
 from openpyxl.cell import Cell
@@ -139,6 +126,10 @@ def create_most_played_packs_sheet(ws: Worksheet, stats: TableStats):
     
     final_table = packs_by_playcount.join(song_breakdown)
     write_table(final_table.reset_index(), ws['A2'])
+
+def create_recently_played_packs_sheet(ws: Worksheet, stats: TableStats):
+    packs = analyzers.recently_played_packs(stats)
+    write_table(packs.reset_index(), ws['A2'])
 
 
 if __name__ == "__main__":

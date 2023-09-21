@@ -145,3 +145,12 @@ def most_played_charts_per_pack(stats: TableStats, N: int = 10):
     # move place into the columns
     x = x.unstack('place')
     return x
+
+def recently_played_packs(stats: TableStats):
+    last_played_packs = (
+        stats.song_data(with_mem=False, keep_unavailable=True)
+        .groupby('pack')
+        .agg({'lastplayed': 'max'})
+        .sort_values(by='lastplayed', ascending=False)
+    )
+    return last_played_packs
