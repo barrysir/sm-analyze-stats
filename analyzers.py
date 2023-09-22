@@ -1,4 +1,6 @@
 from typing import Optional
+
+import numpy as np
 from table_stats import TableStats
 import pandas as pd
 
@@ -147,10 +149,119 @@ def most_played_charts_per_pack(stats: TableStats, N: int = 10):
     return x
 
 def recently_played_packs(stats: TableStats):
+    # todo: keep_unavailable flag: hide packs from recently played list when they get removed?
     last_played_packs = (
-        stats.song_data(with_mem=False, keep_unavailable=True)
+        stats.song_data(with_mem=False, keep_unavailable=False)
         .groupby('pack')
         .agg({'lastplayed': 'max'})
         .sort_values(by='lastplayed', ascending=False)
     )
     return last_played_packs
+
+def pack_completion(stats: TableStats):
+    def group_by_songs(df):
+        return df[~df.index.get_level_values('key').duplicated()]
+    
+    v = stats.song_data(with_mem=False, keep_unavailable=False)
+    v_played = v[v.playcount > 0]
+
+    played_charts = v_played.groupby('pack').size()
+    total_charts = v.groupby('pack').size()
+
+    played_songs = group_by_songs(v_played).groupby('pack').size()
+    total_songs = group_by_songs(v).groupby('pack').size()
+
+    percentage_played = (
+        pd.DataFrame(index=total_charts.index)
+        .assign(
+            played_songs = played_songs,
+            total_songs = total_songs,
+            ratio_songs = played_songs/total_songs,
+            played_charts = played_charts,
+            total_charts = total_charts,
+            ratio_charts = played_charts/total_charts,
+        )
+        .fillna(0)
+        .sort_values(['ratio_songs', 'total_songs'], ascending=False)
+    )
+    return percentage_played
+
+# here are two potential grade breakdowns
+
+GRADE_BY_10 = {}
+GRADE_SIMPLY_LOVE = {
+    1.00: '☆☆☆☆',
+    0.99: '☆☆☆',
+    0.98: '☆☆',
+    0.96: '☆',
+    0.94: 'S+',
+    0.92: 'S',
+    0.89: 'S-',
+    0.86: 'A+',
+    0.83: 'A',
+    0.80: 'A-',
+    0.76: 'B+',
+    0.72: 'B',
+    0.68: 'B-',
+    0.64: 'C+',
+    0.60: 'C',
+    0.55: 'C-',
+    0: 'D',
+}
+
+def pack_score_breakdown(stats: TableStats):
+    # have to be careful to have all packs listed in this table because the highscores table might be missing some packs (e.g. packs that haven't been played yet, or with no passes on any songs)
+    # to ensure this some reindexing trickery is used
+
+    # todo: make this customizable
+    GRADE_LOOKUP = {
+        1.00: '☆☆☆☆',
+        0.99: '☆☆☆',
+        0.98: '☆☆',
+        0.96: '☆',
+        0.90: '90',
+        0.80: '80',
+        0.70: '70',
+        0.60: '60',
+        0.50: '50',
+        0: '0',
+    }
+
+    # todo: filter high scores to only available songs/charts
+
+    # massage GRADE_LOOKUP into values for pd.cut
+    c = list(GRADE_LOOKUP.items())
+    c.sort(key=lambda x: x[0])
+    values = [i[0] for i in c] + [np.inf]
+    labels = [i[1] for i in c]
+
+    # compute the grade of each top score in the leaderboard
+    top_scores_per_chart = stats.highscores[~stats.highscores.index.duplicated(keep='first')]
+    top_grades_per_chart = pd.cut(
+        top_scores_per_chart['score'],
+        values,
+        labels=labels,
+        right=False
+    ).rename('grade')
+
+    # count grades
+    grade_count_per_pack = top_grades_per_chart.to_frame().join(stats.pack_info).groupby(['pack', 'grade']).size()
+
+    # calculate failed charts
+    # first get count of played charts (reindexed to pack list)
+    # second get count of chart scores (reindexed to pack list)
+    # subtract first - second to get number of failed scores per pack
+    v = stats.song_data(with_mem=False, keep_unavailable=False)
+    pack_list = v['pack'].unique()
+    v_played = v[v.playcount > 0]
+    played_charts = v_played.groupby('pack').size().reindex(index=pack_list, fill_value=0)
+
+    scored_charts = grade_count_per_pack.groupby('pack').sum().reindex(index=pack_list, fill_value=0)
+
+    failed_charts = played_charts - scored_charts
+
+    # smash grade counts into a table format (reindexed to pack list) and add the failed scores column
+    asdf = grade_count_per_pack.unstack().sort_index(axis=1, ascending=False).reindex(index=pack_list, fill_value=0)
+    output = asdf.join(failed_charts.rename('Failed'))
+
+    return output

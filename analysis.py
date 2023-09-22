@@ -131,6 +131,16 @@ def create_recently_played_packs_sheet(ws: Worksheet, stats: TableStats):
     packs = analyzers.recently_played_packs(stats)
     write_table(packs.reset_index(), ws['A2'])
 
+def create_pack_completion_sheet(ws: Worksheet, stats: TableStats):
+    completion = analyzers.pack_completion(stats)
+    grade_breakdown = analyzers.pack_score_breakdown(stats)
+
+    table = completion.join(grade_breakdown)
+    write_table(table.reset_index(), ws['A3'])
+
+    # todo: allow label customization
+    # draw labels at H2 (or don't, only allow numbers to be customized and don't print labels)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

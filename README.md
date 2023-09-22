@@ -4,6 +4,13 @@ Simple script to analyze the saved statistics of a Stepmania instance (Stats.xml
 
 You can run this code but I don't really expect people to run it for themselves, it's more for people to look at and steal/reuse for their own analysis needs :) 
 
+
+## Why are songs not indexed by (pack, song), instead indexing by (key) which is more confusing
+
+Because of the possibility of song folder data not being provided and only Stats.xml being provided. (But even only Stats.xml, it could still be split, so this is possible)
+
+Because the "key" is how they are represented natively in the Stepmania XML files (Stats.xml, Upload/ xmls). Splitting into pack/song is an extra layer removed and makes initially parsing the files a little harder.
+
 ## How to use
 
 Standard Python business:
