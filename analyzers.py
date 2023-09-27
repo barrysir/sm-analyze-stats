@@ -186,9 +186,18 @@ def pack_completion(stats: TableStats):
     )
     return percentage_played
 
-# here are two potential grade breakdowns
-
-GRADE_BY_10 = {}
+GRADE_BY_10 = {
+    1.00: '☆☆☆☆',
+    0.99: '☆☆☆',
+    0.98: '☆☆',
+    0.96: '☆',
+    0.90: '90',
+    0.80: '80',
+    0.70: '70',
+    0.60: '60',
+    0.50: '50',
+    0: '0',
+}
 GRADE_SIMPLY_LOVE = {
     1.00: '☆☆☆☆',
     0.99: '☆☆☆',
@@ -209,34 +218,22 @@ GRADE_SIMPLY_LOVE = {
     0: 'D',
 }
 
-def pack_score_breakdown(stats: TableStats):
+def pack_score_breakdown(stats: TableStats, grade_boundaries: Optional[dict[float, str]] = None):
     # have to be careful to have all packs listed in this table because the highscores table might be missing some packs (e.g. packs that haven't been played yet, or with no passes on any songs)
     # to ensure this some reindexing trickery is used
 
-    # todo: make this customizable
-    GRADE_LOOKUP = {
-        1.00: '☆☆☆☆',
-        0.99: '☆☆☆',
-        0.98: '☆☆',
-        0.96: '☆',
-        0.90: '90',
-        0.80: '80',
-        0.70: '70',
-        0.60: '60',
-        0.50: '50',
-        0: '0',
-    }
+    if grade_boundaries is None:
+        grade_boundaries = GRADE_BY_10
 
-    # todo: filter high scores to only available songs/charts
-
-    # massage GRADE_LOOKUP into values for pd.cut
-    c = list(GRADE_LOOKUP.items())
+    # massage grade_boundaries into values for pd.cut
+    c = list(grade_boundaries.items())
     c.sort(key=lambda x: x[0])
     values = [i[0] for i in c] + [np.inf]
     labels = [i[1] for i in c]
 
     # compute the grade of each top score in the leaderboard
-    top_scores_per_chart = stats.highscores[~stats.highscores.index.duplicated(keep='first')]
+    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False)
+    top_scores_per_chart = leaderboards[~leaderboards.index.duplicated(keep='first')]
     top_grades_per_chart = pd.cut(
         top_scores_per_chart['score'],
         values,
@@ -248,16 +245,16 @@ def pack_score_breakdown(stats: TableStats):
     grade_count_per_pack = top_grades_per_chart.to_frame().join(stats.pack_info).groupby(['pack', 'grade']).size()
 
     # calculate failed charts
+    # grab pack list for reindexing
+    v = stats.song_data(with_mem=False, keep_unavailable=False)
+    pack_list = v['pack'].unique()
+    
     # first get count of played charts (reindexed to pack list)
     # second get count of chart scores (reindexed to pack list)
     # subtract first - second to get number of failed scores per pack
-    v = stats.song_data(with_mem=False, keep_unavailable=False)
-    pack_list = v['pack'].unique()
     v_played = v[v.playcount > 0]
     played_charts = v_played.groupby('pack').size().reindex(index=pack_list, fill_value=0)
-
     scored_charts = grade_count_per_pack.groupby('pack').sum().reindex(index=pack_list, fill_value=0)
-
     failed_charts = played_charts - scored_charts
 
     # smash grade counts into a table format (reindexed to pack list) and add the failed scores column

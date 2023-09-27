@@ -275,6 +275,15 @@ class TableStats(TableStatsConstructing):
             df = df[df.index.isin(self.availablesongs.index)]
         return df
 
+    def leaderboards(self, keep_unavailable: bool = True, with_mem: bool = False):
+        df = self.highscores
+        if not with_mem:
+            df = df[df.join(self.pack_info).pack != '@mem']
+        if not keep_unavailable:
+            df = df[df.index.isin(self.availablesongs.index)]
+        return df
+        
+
     @cached_property
     def pack_info(self):
         return self.combined.groupby('key').nth(0).reset_index(level=[1,2])[['pack', 'song']]

@@ -133,13 +133,15 @@ def create_recently_played_packs_sheet(ws: Worksheet, stats: TableStats):
 
 def create_pack_completion_sheet(ws: Worksheet, stats: TableStats):
     completion = analyzers.pack_completion(stats)
-    grade_breakdown = analyzers.pack_score_breakdown(stats)
+
+    # if the user wants to use different grade boundaries, they can customize the calculations,
+    # but they'll have to change the column labeling themselves within the template sheet (this gives them maximal control)
+    # todo: pass in only a single array of grade boundaries to reflect that
+    # a dict of column names can be passed for convenience but the code will only use arrays
+    grade_breakdown = analyzers.pack_score_breakdown(stats, analyzers.GRADE_BY_10)
 
     table = completion.join(grade_breakdown)
     write_table(table.reset_index(), ws['A3'])
-
-    # todo: allow label customization
-    # draw labels at H2 (or don't, only allow numbers to be customized and don't print labels)
 
 
 if __name__ == "__main__":
