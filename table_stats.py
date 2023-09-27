@@ -97,7 +97,11 @@ class TableStatsConstructing:
                                 if ratemod < 1:
                                     continue
                                 
-                        chart_lb.append((score.find('Name').text, float(score.find('PercentDP').text)))
+                        chart_lb.append((
+                            score.find('Name').text, 
+                            float(score.find('PercentDP').text), 
+                            datetime.fromisoformat(score.find('DateTime').text)
+                        ))
 
                     chart_lb.sort(key=lambda x: x[1], reverse=True)
                     for i,(name, dp) in enumerate(chart_lb):
@@ -106,7 +110,7 @@ class TableStatsConstructing:
         df_playdata = pd.DataFrame(playdata, columns=['key', 'steptype', 'difficulty', 'playcount', 'lastplayed'])
         df_playdata = df_playdata.set_index(['key', 'steptype', 'difficulty'])
 
-        df_leaderboards = pd.DataFrame(leaderboards, columns=['key', 'steptype', 'difficulty', 'place', 'player', 'score'])
+        df_leaderboards = pd.DataFrame(leaderboards, columns=['key', 'steptype', 'difficulty', 'place', 'player', 'score', 'timestamp'])
         df_leaderboards = df_leaderboards.set_index(['key', 'steptype', 'difficulty'])
 
         self.playedsongs = df_playdata
