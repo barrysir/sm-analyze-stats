@@ -143,6 +143,22 @@ def create_pack_completion_sheet(ws: Worksheet, stats: TableStats):
     table = completion.join(grade_breakdown)
     write_table(table.reset_index(), ws['A3'])
 
+def create_highest_scores_sheet(ws: Worksheet, stats: TableStats):
+    # ideas for other ways to split it
+    #   - top 5 for each block difficulty
+    #   - highest scores (DDR only)
+    # there are too many ways to slice the highscore data -- 
+    # I think the only way to make it useful is to make it interactive
+    a = analyzers.song_grades_by_meter(stats, analyzers.GRADE_BY_10)
+    highest_scores = analyzers.highest_scores(stats, with_ddr=False)
+    highest_passes = analyzers.highest_passes(stats, with_ddr=False)
+    
+    write_table(a, ws['S2'])
+    write_table(highest_scores, ws['A29'])
+    write_table(highest_passes, ws['J29'])
+
+    # todo: doubles sheet
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

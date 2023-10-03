@@ -1,4 +1,3 @@
-
 import argparse
 from collections import Counter
 import csv
@@ -9,7 +8,7 @@ from typing import Optional, Set, Tuple
 import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
-import datetime as dt
+from datetime import datetime
 from dataclasses import dataclass
 
 class TableStatsConstructing:
@@ -104,8 +103,8 @@ class TableStatsConstructing:
                         ))
 
                     chart_lb.sort(key=lambda x: x[1], reverse=True)
-                    for i,(name, dp) in enumerate(chart_lb):
-                        leaderboards.append((songdir, steptype, difficulty, i+1, name, dp))
+                    for i,(name, dp, timestamp) in enumerate(chart_lb):
+                        leaderboards.append((songdir, steptype, difficulty, i+1, name, dp, timestamp))
 
         df_playdata = pd.DataFrame(playdata, columns=['key', 'steptype', 'difficulty', 'playcount', 'lastplayed'])
         df_playdata = df_playdata.set_index(['key', 'steptype', 'difficulty'])
@@ -279,10 +278,15 @@ class TableStats(TableStatsConstructing):
             df = df[df.index.isin(self.availablesongs.index)]
         return df
 
-    def leaderboards(self, keep_unavailable: bool = True, with_mem: bool = False):
+    def leaderboards(self, keep_unavailable: bool = True, with_mem: bool = False, with_ddr: bool = True):
         df = self.highscores
+        v = df.join(self.pack_info)
+
+        if not with_ddr:
+            ddr_song_list = v[v.pack.str.contains("DDR") | v.pack.str.contains("DanceDanceRevolution")].index
+            df = df[~df.index.isin(ddr_song_list)]
         if not with_mem:
-            df = df[df.join(self.pack_info).pack != '@mem']
+            df = df[v.pack != '@mem']
         if not keep_unavailable:
             df = df[df.index.isin(self.availablesongs.index)]
         return df

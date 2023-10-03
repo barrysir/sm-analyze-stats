@@ -262,3 +262,49 @@ def pack_score_breakdown(stats: TableStats, grade_boundaries: Optional[dict[floa
     output = asdf.join(failed_charts.rename('Failed'))
 
     return output
+
+def song_grades_by_meter(stats: TableStats, grade_boundaries: Optional[dict[float, str]] = None, upper_limit: int = 27):
+    if grade_boundaries is None:
+        grade_boundaries = GRADE_BY_10
+
+    # massage grade_boundaries into values for pd.cut
+    c = list(grade_boundaries.items())
+    c.sort(key=lambda x: x[0])
+    values = [i[0] for i in c] + [np.inf]
+    labels = [i[1] for i in c]
+
+    # compute the grade of each top score in the leaderboard
+    # exclude DDR charts because they have their own difficulty meter
+    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=False)
+    top_scores_per_chart = leaderboards[~leaderboards.index.duplicated(keep='first')]
+    top_grades_per_chart = pd.cut(
+        top_scores_per_chart['score'],
+        values,
+        labels=labels,
+        right=False
+    ).rename('grade')
+    
+    x = top_grades_per_chart.to_frame().join(stats.song_data(with_mem=False, keep_unavailable=False)).groupby(['meter', 'grade']).size()
+
+    # Filter to only songs below or at the difficulty limit
+    x = x.loc[:upper_limit]
+    
+    # todo: fill missing difficulties with 0
+    return x.unstack()
+
+def highest_scores(stats: TableStats, with_ddr: bool, limit: int = 100):
+    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr).join(stats.song_data(with_mem=False, keep_unavailable=False)).sort_values(by=['score', 'meter'], ascending=False)
+    return (
+        leaderboards.head(limit)
+        .reset_index()
+        [['pack', 'song', 'steptype', 'difficulty', 'meter', 'player', 'score', 'timestamp']]
+    )
+
+def highest_passes(stats: TableStats, with_ddr: bool, max_diff: int = 27, limit: int = 100):
+    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr).join(stats.song_data(with_mem=False, keep_unavailable=False)).sort_values(by=['meter', 'score'], ascending=False)
+    leaderboards = leaderboards[leaderboards.meter <= max_diff]
+    return (
+        leaderboards.head(limit)
+        .reset_index()
+        [['pack', 'song', 'steptype', 'difficulty', 'meter', 'player', 'score', 'timestamp']]
+    )
