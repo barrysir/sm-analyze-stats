@@ -280,16 +280,17 @@ class TableStats(TableStatsConstructing):
 
     def leaderboards(self, keep_unavailable: bool = True, with_mem: bool = False, with_ddr: bool = True):
         df = self.highscores
-        v = df.join(self.pack_info)
 
+        # join pack column so we can filter on it, drop it later
+        df = df.join(self.pack_info['pack'])
         if not with_ddr:
-            ddr_song_list = v[v.pack.str.contains("DDR") | v.pack.str.contains("DanceDanceRevolution")].index
+            ddr_song_list = df[df.pack.str.contains("DDR") | df.pack.str.contains("DanceDanceRevolution")].index
             df = df[~df.index.isin(ddr_song_list)]
         if not with_mem:
-            df = df[v.pack != '@mem']
+            df = df[df.pack != '@mem']
         if not keep_unavailable:
             df = df[df.index.isin(self.availablesongs.index)]
-        return df
+        return df.drop('pack')
         
 
     @cached_property
