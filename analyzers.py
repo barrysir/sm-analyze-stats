@@ -293,7 +293,7 @@ def song_grades_by_meter(stats: TableStats, grade_boundaries: Optional[dict[floa
     return x.unstack()
 
 def highest_scores(stats: TableStats, with_ddr: bool, limit: int = 100):
-    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr).join(stats.song_data(with_mem=False, keep_unavailable=False)).join(stats.song_shorthand).sort_values(by=['score', 'meter'], ascending=False)
+    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr).join(stats.song_data(with_mem=False, keep_unavailable=False)).join(stats.song_shorthand['stepfull']).sort_values(by=['score', 'meter'], ascending=False)
     return (
         leaderboards.head(limit)
         .reset_index()
@@ -301,7 +301,7 @@ def highest_scores(stats: TableStats, with_ddr: bool, limit: int = 100):
     )
 
 def highest_passes(stats: TableStats, with_ddr: bool, max_diff: int = 27, limit: int = 100):
-    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr).join(stats.song_data(with_mem=False, keep_unavailable=False)).join(stats.song_shorthand).sort_values(by=['meter', 'score'], ascending=False)
+    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr).join(stats.song_data(with_mem=False, keep_unavailable=False)).join(stats.song_shorthand['stepfull']).sort_values(by=['meter', 'score'], ascending=False)
     leaderboards = leaderboards[leaderboards.meter <= max_diff]
     return (
         leaderboards.head(limit)

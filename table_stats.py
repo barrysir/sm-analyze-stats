@@ -290,7 +290,7 @@ class TableStats(TableStatsConstructing):
             df = df[df.pack != '@mem']
         if not keep_unavailable:
             df = df[df.index.isin(self.availablesongs.index)]
-        return df.drop('pack')
+        return df.drop('pack', axis='columns')
         
 
     @cached_property
