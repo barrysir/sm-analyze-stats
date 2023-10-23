@@ -143,7 +143,7 @@ def create_highest_scores_sheet(ws: Worksheet, stats: TableStats):
     highest_scores = analyzers.highest_scores(stats, with_ddr=False)
     highest_passes = analyzers.highest_passes(stats, with_ddr=False)
     
-    write_table(a, ws['S2'])
+    write_table(a.reset_index(), ws['S2'])
     write_table(highest_scores, ws['A29'])
     write_table(highest_passes, ws['J29'])
 
