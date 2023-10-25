@@ -308,3 +308,11 @@ def highest_passes(stats: TableStats, with_ddr: bool, max_diff: int = 27, limit:
         .reset_index()
         [['pack', 'song', 'stepfull', 'difficulty', 'meter', 'player', 'score', 'timestamp']]
     )
+
+def playcount_over_time(stats: TableStats):
+    pass
+
+    # playcount per day (calendar view)
+    # playcount over time: per hour, per day, per week, over a whole year
+    # I can't render this in Excel...
+    # would've been better to write the whole thing in javascript maybe...

@@ -196,8 +196,6 @@ if __name__ == "__main__":
 
     wb.save(args.output)
 
-    # print(data)
-
     # I'm goig to have
     #   a script which outputs every data table (as csvs? json?)
     #       a simple javascript renderer? (drag in a data file: tabs, simple table rendering)
@@ -215,16 +213,3 @@ if __name__ == "__main__":
     #           can copy paste data from excel into google sheets
 
     #   a notebook where you can compute each table individually
-    #   
-
-    # tree = ET.parse('Stats.xml')
-    # root = tree.getroot()
-    # songscores = root.find('SongScores')
-
-    # playcount, highscores = allsongnames(songscores)
-
-    # df_playedsongs = pd.DataFrame(playcount, columns=['key', 'steptype', 'difficulty', 'playcount', 'lastplayed'])
-    # df_playedsongs = df_playedsongs.set_index(['key', 'steptype', 'difficulty'])
-
-    # df_leaderboards = pd.DataFrame(highscores, columns=['key', 'steptype', 'difficulty', 'place', 'player', 'dp'])
-    # df_leaderboards = df_leaderboards.set_index(['key', 'steptype', 'difficulty'])
