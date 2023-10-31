@@ -11,7 +11,7 @@ def chart_counts_for_each_pack(stats: TableStats, modes: dict[str, str]) -> pd.D
     """
     Generate number of charts and songs per pack, in total, and filtered to each given mode.
     (pack name) -> (total song count, total chart count, ... song count per mode, chart count per mode)
-    
+
     Modes given in {steptype: column_label} format.
     The name of the two columns for each mode will be `{column_label}_charts` and `{column_label}_songs`.
         e.g. modes = {"dance-single": "single"} -> "single_charts" and "single_songs"
@@ -49,7 +49,7 @@ def pack_difficulty_histogram(stats: TableStats, upper_limit: int = 27) -> pd.Da
     Generates columns 1..upper_limit-1, then `upper_limit+`, then ?
     Each column counts the number of charts with that meter.
     The values are then normalized so they sit within [0,1].
-    
+
     All charts with meter >= upper_limit are grouped into the top folder.
     The side effect of this is to deal with joke difficulties, 69, 420, 31337, etc.
     ? column is for any charts which don't have meter data in the table (unfilled song data).
@@ -211,6 +211,7 @@ def pack_completion(stats: TableStats) -> pd.DataFrame:
     (pack) -> (played songs, total songs, ratio songs, played charts, total charts, ratio charts)
     sorted by (ratio_songs, total_songs) descending
     """
+
     def one_row_per_song(song_data: pd.DataFrame) -> pd.DataFrame:
         return song_data[~song_data.index.get_level_values("key").duplicated()]
 
@@ -274,13 +275,13 @@ GRADE_SIMPLY_LOVE = {
 
 def pack_score_breakdown(stats: TableStats, grade_boundaries: Optional[dict[float, str]] = None) -> pd.DataFrame:
     """
-    Count the number of quads, tri-stars, double stars, fails, etc. achieved in each pack 
+    Count the number of quads, tri-stars, double stars, fails, etc. achieved in each pack
     (grade boundaries are customizable).
 
     (pack) -> (number of charts in each grade boundary + extra Failed column)
 
     grade_boundaries - format {grade_threshold: label}. small example: `{0.96: "star", 0.70: "70", 0: "D"}`
-        The script will create columns "star", "70", "D" counting the number of scores in each boundary, 
+        The script will create columns "star", "70", "D" counting the number of scores in each boundary,
         plus an additional "Failed" column counting all played charts with no score (no passes).
     """
     if grade_boundaries is None:
@@ -327,7 +328,7 @@ def song_grades_by_meter(
     stats: TableStats, grade_boundaries: Optional[dict[float, str]] = None, upper_limit: int = 27
 ) -> pd.DataFrame:
     """
-    Count the number of quads, tri-stars, double stars, fails, etc. achieved across all songs 
+    Count the number of quads, tri-stars, double stars, fails, etc. achieved across all songs
     of a given difficulty block (grade boundaries are customizable).
 
     (meter) -> (number of charts in each grade boundary)
@@ -392,7 +393,7 @@ def highest_passes(stats: TableStats, with_ddr: bool, max_diff: int = 27, limit:
     sorted by (meter, score) descending
 
     with_ddr - exclude DDR songs, since their metering system is different
-    max_diff - required to exclude passes on joke difficulties, e.g. 69. 
+    max_diff - required to exclude passes on joke difficulties, e.g. 69.
     """
     leaderboards = (
         stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr)

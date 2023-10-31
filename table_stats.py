@@ -193,7 +193,7 @@ class TableStats(TableStatsConstructing):
             - full: human readable version of the steptype: "Single", "Double"
         """
 
-        def shorthand(row) -> tuple: # noqa: ANN001
+        def shorthand(row) -> tuple:  # noqa: ANN001
             """Return a string like `(song name) SX10`"""
             # potential future idea: display edit name? (song name) SZ69 iunno
             steptype = row.name[1]

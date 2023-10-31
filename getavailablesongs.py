@@ -103,26 +103,26 @@ if __name__ == "__main__":
 
     start = lastwrite = time.monotonic()
 
+    def pack_listing(songs_folder: Path, pack_filter: List[str], skip_to_pack: Optional[str]) -> Iterator[Path]:
+        """Iterate over packs to scan based on command-line options."""
+        if pack_filter is None:
+            allpacks = pack_iterator(songs_folder)
+        else:
+            allpacks = [songs_folder / i for i in pack_filter]
+
+        skipping = skip_to_pack is not None
+        for packpath in allpacks:
+            packname = packpath.name
+
+            # skip entries until (skip_to_pack) is found
+            if packname == skip_to_pack:
+                skipping = False
+            if skipping:
+                continue
+
+            yield packpath
+
     try:
-        def pack_listing(songs_folder: Path, pack_filter: List[str], skip_to_pack: Optional[str]) -> Iterator[Path]:
-            """Iterate over packs to scan based on command-line options."""
-            if pack_filter is None:
-                allpacks = pack_iterator(songs_folder)
-            else:
-                allpacks = [songs_folder / i for i in pack_filter]
-
-            skipping = skip_to_pack is not None
-            for packpath in allpacks:
-                packname = packpath.name
-
-                # skip entries until (skip_to_pack) is found
-                if packname == skip_to_pack:
-                    skipping = False
-                if skipping:
-                    continue
-
-                yield packpath
-
         allpacks = list(pack_listing(SONGS_PATH, args.pack, args.skip))
         for i, packpath in enumerate(allpacks):
             # show which pack we're currently on cause the scan takes a while

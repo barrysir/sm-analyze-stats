@@ -35,6 +35,7 @@ diffs = OrderedDict(
 def _pdict(arr: Iterable) -> dict:
     return {v: k for k, v in enumerate(arr)}
 
+
 _MODE = _pdict(modes.keys())
 _DIFFS = _pdict(diffs.keys())
 
@@ -49,6 +50,7 @@ def difficulty_spread_sorter(s: pd.Series) -> pd.Series:
     elif s.name == "difficulty":
         return s.map(lambda x: _DIFFS.get(x, len(_DIFFS)))
     return s
+
 
 def pack_name_sorter(s: pd.Series) -> pd.Series:
     """Sorter function to sort columns by pack name"""
