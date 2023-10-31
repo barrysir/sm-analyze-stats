@@ -11,8 +11,10 @@ The only user of this code currently is me so sorry if it's hard to use.
 
 Standard Python business:
   * Python 3.9+
-  * Dependencies are in `requirements.txt`. Install with `pip install -r requirements.txt`.
-    * Optionally create a virtual environment before installing if you don't want to clutter your main Python installation. `python -m venv venv`
+  * Optionally create a virtual environment before installing if you don't want to clutter your main Python installation. `python -m venv venv` to create the environment, then `venv/Scripts/activate` (or wherever you activation script is) to enter it.
+  * Dependencies are in `pyproject.toml`. Install with `pip install .`
+  * The `pyproject.toml` also has optional dependencies listed for development and notebook libraries. To install these, e.g. the `notebook` optional dependencies, run `pip install .[notebook]`.
+    
 
 ### Prerequisite data files
 
