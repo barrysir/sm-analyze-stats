@@ -19,6 +19,7 @@ if __name__ == "__main__":
 
     # arguments good, now import everything and run the main script
 
+    print("Prepping libraries...")
     from pathlib import Path
 
     from openpyxl import load_workbook
@@ -28,7 +29,9 @@ if __name__ == "__main__":
     from table_stats import TableStats
 
     s = TableStats()
+    print("Loading Stats.xml...")
     s.fill_stats_xml(Path(args.stats_xml))
+    print("Loading song listing data...")
     s.fill_song_listing(Path(args.song_listing_csv))
 
     wb = load_workbook(args.template)
