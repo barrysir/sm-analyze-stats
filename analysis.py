@@ -1,51 +1,41 @@
 import argparse
-from collections import Counter
-import csv
-from functools import cached_property
-import functools
+import copy
 from pathlib import Path
-from typing import Optional, Set, Tuple
-import xml.etree.ElementTree as ET
+from typing import Dict, Optional, Union
+
 import pandas as pd
-import numpy as np
-import datetime as dt
-from dataclasses import dataclass
+from openpyxl import load_workbook
+from openpyxl.cell import Cell
+from openpyxl.utils import column_index_from_string
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.worksheet.cell_range import CellRange
+from openpyxl.worksheet.worksheet import Worksheet
+
+import analyzers
 from table_stats import TableStats
 
 
 def strip_prefix(string: str, prefix: str) -> str:
+    """Strip prefix from string if it exists"""
     if string.startswith(prefix):
         return string[len(prefix) :]
     return string
 
 
-def pack_ordering(s):
-    return s.str.lower()
+# ---------------------------------------------
+#   Helpers for openpyxl
+# ---------------------------------------------
 
 
-# Note - it can be tempting to get the packname and song by splitting the key.
-#     The pack name will be correct but the song name will be subtly wrong because it returns
-#     the name of the folder and not the song title itself!
-#     TO get the proper song name, you'll have to look at availablesongs (TODO write this better)
-
-import openpyxl
-from openpyxl import Workbook, load_workbook
-from openpyxl.cell import Cell
-from openpyxl.comments import Comment
-from openpyxl.styles import Alignment, Fill, PatternFill
-from openpyxl.utils import get_column_letter, column_index_from_string
-from openpyxl.worksheet.worksheet import Worksheet
-from openpyxl.worksheet.cell_range import CellRange
-import copy
-
-
-def letter_to_index(c):
+def letter_to_index(c: Union[str, int]) -> int:
+    """Convert a column index or column name (eg. J, AA) to a column index."""
     if isinstance(c, str):
         return column_index_from_string(c)
     return c
 
 
-def copy_columns(ws, column_range, dest_column):
+def copy_columns(ws: Worksheet, column_range: CellRange, dest_column: Union[str, int]) -> None:
+    """Copy and paste columns with `column_range` to the columns starting fromm `dest_column`."""
     dest_column = letter_to_index(dest_column)
 
     # copy cell data and formatting
@@ -71,28 +61,30 @@ def copy_columns(ws, column_range, dest_column):
         ws.merge_cells(cr.coord)
 
 
-from openpyxl.utils.dataframe import dataframe_to_rows
-
-
-def write_table(df, cell: Cell, index=False, header=False):
+def write_table(df: pd.DataFrame, cell: Cell, index: bool = False, header: bool = False) -> None:
+    """Write Pandas dataframe to spreadsheet, starting from cell and going down and right"""
     for dr, row in enumerate(dataframe_to_rows(df, index=index, header=header)):
         for dc, value in enumerate(row):
             cell.offset(dr, dc).value = value
 
 
-def write_row(row: list, cell: Cell):
+def write_row(row: list, cell: Cell) -> None:
+    """Write list of values to a spreadsheet, starting from a cell and moving right."""
     for dc, value in enumerate(row):
         cell.offset(0, dc).value = value
 
 
-import analyzers
+# ---------------------------------------------
+#   Table generation code
+# ---------------------------------------------
 
 
-def create_general_sheet(ws: Worksheet, stats: TableStats, modes=None):
-    if modes is None:
-        modes = {"dance-single": "Singles", "dance-double": "Doubles"}
+def create_general_sheet(ws: Worksheet, stats: TableStats, mode_labels: Optional[Dict[str, str]] = None) -> None:
+    """Create General sheet"""
+    if mode_labels is None:
+        mode_labels = {"dance-single": "Singles", "dance-double": "Doubles"}
 
-    a = analyzers.chart_counts_for_each_pack(stats, modes)
+    a = analyzers.chart_counts_for_each_pack(stats, mode_labels)
     write_table(a.reset_index(), ws["A4"])
 
     ws["A3"].value = len(a)  # set pack count
@@ -104,8 +96,9 @@ def create_general_sheet(ws: Worksheet, stats: TableStats, modes=None):
     write_table(a.reset_index().drop("pack", axis="columns"), ws["H3"], header=True)
 
 
-def create_most_played_charts_sheet(ws: Worksheet, stats: TableStats, limit: int = 50):
-    all_songs = analyzers.most_played_charts(stats, limit)
+def create_most_played_charts_sheet(ws: Worksheet, stats: TableStats, limit: int = 50) -> None:
+    """Create Most Played Charts sheet"""
+    all_songs = analyzers.most_played_charts(stats, limit, modes=["dance-single", "dance-double"])
     doubles_only = analyzers.most_played_charts(stats, limit, modes=["dance-double"])
 
     write_table(all_songs, ws["A3"])
@@ -114,8 +107,9 @@ def create_most_played_charts_sheet(ws: Worksheet, stats: TableStats, limit: int
     # todo: set background colour for extra song entries?
 
 
-def create_most_played_songs_sheet(ws: Worksheet, stats: TableStats, limit: int = 50):
-    all_songs = analyzers.most_played_songs(stats, limit)
+def create_most_played_songs_sheet(ws: Worksheet, stats: TableStats, limit: int = 50) -> None:
+    """Create Most Played Songs sheet"""
+    all_songs = analyzers.most_played_songs(stats, limit, modes=["dance-single", "dance-double"])
     doubles_only = analyzers.most_played_songs(stats, limit, modes=["dance-double"])
 
     write_table(all_songs, ws["A3"])
@@ -125,7 +119,8 @@ def create_most_played_songs_sheet(ws: Worksheet, stats: TableStats, limit: int 
     # todo: doesn't work for limits > 50, decide what to do
 
 
-def create_most_played_packs_sheet(ws: Worksheet, stats: TableStats):
+def create_most_played_packs_sheet(ws: Worksheet, stats: TableStats) -> None:
+    """Create Most Played Packs sheet"""
     packs_by_playcount = analyzers.most_played_packs(stats)
     song_breakdown = analyzers.most_played_charts_per_pack(stats)
 
@@ -133,25 +128,27 @@ def create_most_played_packs_sheet(ws: Worksheet, stats: TableStats):
     write_table(final_table.reset_index(), ws["A2"])
 
 
-def create_recently_played_packs_sheet(ws: Worksheet, stats: TableStats):
+def create_recently_played_packs_sheet(ws: Worksheet, stats: TableStats) -> None:
+    """Create Recently Played Packs sheet"""
     packs = analyzers.recently_played_packs(stats)
     write_table(packs.reset_index(), ws["A2"])
 
 
-def create_pack_completion_sheet(ws: Worksheet, stats: TableStats):
+def create_pack_completion_sheet(ws: Worksheet, stats: TableStats) -> None:
+    """Create Pack Completion sheet"""
     completion = analyzers.pack_completion(stats)
 
-    # if the user wants to use different grade boundaries, they can customize the calculations,
-    # but they'll have to change the column labeling themselves within the template sheet (this gives them maximal control)
-    # todo: pass in only a single array of grade boundaries to reflect that
-    # a dict of column names can be passed for convenience but the code will only use arrays
+    # note: column labels for grade boundaries aren't written out in code,
+    # they're hardcoded in the Excel sheet so user has maximal control over formatting.
+    # if grade boundaries are changed the excel sheet has to be modified as well
     grade_breakdown = analyzers.pack_score_breakdown(stats, analyzers.GRADE_BY_10)
 
     table = completion.join(grade_breakdown)
     write_table(table.reset_index(), ws["A3"])
 
 
-def create_highest_scores_sheet(ws: Worksheet, stats: TableStats):
+def create_highest_scores_sheet(ws: Worksheet, stats: TableStats) -> None:
+    """Create Highest Scores + Passes sheet"""
     # ideas for other ways to split it
     #   - top 5 for each block difficulty
     #   - highest scores (DDR only)
@@ -175,8 +172,9 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("path", help="Path to Stats.xml.")
-    parser.add_argument("song_listing", help="Path to file generated by getavailablesongs.py.")
-    parser.add_argument("--output", default="output.xlsx", help="Output path.")
+    parser.add_argument("song_listing", help="Path to file generated by getavailablesongs.py")
+    parser.add_argument("--template", default="template.xlsx", help="Path to template .xlsx file")
+    parser.add_argument("--output", default="output.xlsx", help="Output path")
 
     # args = parser.parse_args(['Stats.xml', 'available.csv'])
     args = parser.parse_args()
@@ -185,9 +183,9 @@ if __name__ == "__main__":
     s.fill_stats_xml(Path(args.path))
     s.fill_song_listing(Path(args.song_listing))
 
-    wb = load_workbook("template.xlsx")
+    wb = load_workbook(args.template)
 
-    def fetch(sheet_name) -> Worksheet:
+    def fetch(sheet_name: str) -> Worksheet:        # noqa: D103
         print(f"Generating {sheet_name} sheet...")
         return wb[sheet_name]
 

@@ -1,15 +1,15 @@
-import argparse
-from collections import Counter
 import csv
+import xml.etree.ElementTree as ET
+from collections import Counter
+from dataclasses import dataclass
+from datetime import datetime
 from functools import cached_property
-import functools
 from pathlib import Path
 from typing import Optional, Set, Tuple
-import xml.etree.ElementTree as ET
+
 import pandas as pd
-import numpy as np
-from datetime import datetime
-from dataclasses import dataclass
+
+import constants
 
 
 class TableStatsConstructing:
@@ -18,22 +18,21 @@ class TableStatsConstructing:
     def fill_stats_xml(
         self,
         path_to_stats: Path,
-        packs_to_ignore: Set[str] = set(),
+        packs_to_ignore: Optional[Set[str]] = None,
         track_usb_customs: bool = False,
         track_slowed_down_plays: bool = False,
-    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    ) -> None:
         """
-        Generate useful tables from contents of Stats.xml.
+        Fill data from Stats.xml.
 
-        Includes some options to control output data:
-            packs_to_ignore: A set of pack names to ignore.
-            track_usb_customs: Whether to include USB customs in the data.
-                If true, USB customs are stored in a pack named '@mem'.
-            track_slowed_down_plays: Whether to include downrated plays in the leaderboard.
-                Cop-out flag made for myself to parse out downrated scores as my arcade used to record scores for downrates.
+        packs_to_ignore: A set of pack names to ignore.
+        track_usb_customs: Whether to include USB customs in the data.
+            If true, USB customs are stored in a pack named '@mem'.
+        track_slowed_down_plays: Whether to include downrated plays in the generated leaderboards.
+            Cop-out flag for myself as my arcade used to record scores for downrates.
 
-                TODO: might be better to clean this up in the stats file itself.
-                    create a remove_ratemodded_scores() function
+            TODO: might be better to clean this up in the stats file itself.
+                create a remove_ratemodded_scores() function
 
         Returns 2 datatables:
         (1) playstats - Playcount and last played date for every chart.
@@ -49,6 +48,9 @@ class TableStatsConstructing:
                 player (4-character str)
                 score (float) - ranging from 0 to 1, so 0.9900 -> 99.00
         """
+        if packs_to_ignore is None:
+            packs_to_ignore = set()
+
         stats_xml = ET.parse(path_to_stats)
         root = stats_xml.getroot()
         songscores = root.find("SongScores")
@@ -77,7 +79,8 @@ class TableStatsConstructing:
                 # grab chart identifiers: steptype and difficulty
                 steptype = steps.get("StepsType")  # dance-single, dance-double, ...
                 difficulty = steps.get("Difficulty")  # Beginner, Easy, Medium, Hard, Challenge, Edit, ...
-                # if there are multiple edits, give them unique names to make processing easier, "Edit", "Edit-1", "Edit-2", etc.
+                # if there are multiple edits, give them unique names to make processing easier,
+                # "Edit", "Edit-1", "Edit-2", etc.
                 if difficulty == "Edit":
                     if editcount >= 1:
                         difficulty = f"{difficulty}-{editcount}"
@@ -127,11 +130,16 @@ class TableStatsConstructing:
         self.playedsongs = df_playdata
         self.highscores = df_leaderboards
 
-    def fill_song_listing(self, path_to_csv: Path, packs_to_ignore: Set[str] = set()) -> pd.DataFrame:
-        def loadfromcsv(path):
+    def fill_song_listing(self, path_to_csv: Path, packs_to_ignore: Optional[Set[str]] = None) -> None:
+        """Load data from the song listing data file."""
+
+        def loadfromcsv(path: Path) -> list:
             with open(path, newline="", encoding="utf8") as csvfile:
                 reader = csv.reader(csvfile, delimiter=",", quotechar='"')
                 return [row for row in reader]
+
+        if packs_to_ignore is None:
+            packs_to_ignore = set()
 
         try:
             availablesongs = loadfromcsv(path_to_csv)
@@ -175,29 +183,25 @@ class TableStats(TableStatsConstructing):
     # data from Songs folder
     availablesongs: Optional[pd.DataFrame] = None
 
-    # Lookup table from song key -> pack name and song title.
-    # packinfo: Optional[pd.DataFrame] = None
-
-    # Lookup table mapping (song key, steptype, difficulty) -> shorthand text of the chart: "Bloodrush SX12", "Disconnected Disco DX10".
-    # song_shorthand: Optional[pd.DataFrame]
-
     @cached_property
-    def song_shorthand(self):
-        steptypes = {"dance-single": "S", "dance-double": "D"}
-        steptypes_full = {"dance-single": "Single", "dance-double": "Double"}
-        difficulties = {"Beginner": "B", "Easy": "E", "Medium": "M", "Hard": "H", "Challenge": "X", "Edit": "Z"}
+    def song_shorthand(self) -> pd.DataFrame:
+        """
+        Lookup table for various shorthand descriptions of the chart.
+        (song key, steptype, difficulty) -> (shorthand, tag, stepfull).
+            - shorthand: "Bloodrush SX12", "Disconnected Disco DX10"
+            - tag: just the difficulty part: "SX12", "DX10"
+            - full: human readable version of the steptype: "Single", "Double"
+        """
 
-        def shorthand(row):
-            # SB, SE, SM, SH, SX
-            # (song name) SX10
-            # idea (not implemented): display edit name? (song name) SZ69 iunno
+        def shorthand(row) -> tuple: # noqa: ANN001
+            """Return a string like `(song name) SX10`"""
+            # potential future idea: display edit name? (song name) SZ69 iunno
             steptype = row.name[1]
+            # this .partition() is to undo the diff name mangling done for edits: "Edit-1", "Edit-2", etc.
             diff = row.name[2].partition("-")[0]
-            s = steptypes.get(steptype, None)
-            d = difficulties.get(diff, None)
-            if s is None or d is None:
-                return None
-            sfull = steptypes_full.get(steptype, None)
+            s = t.single_letter if (t := constants.modes.get(steptype)) else steptype
+            d = t.single_letter if (t := constants.diffs.get(diff)) else diff
+            sfull = t.full_name if (t := constants.modes.get(steptype)) else steptype
             meter = "" if pd.isna(row.meter) else int(row.meter)
             dtag = f"{s}{d}{meter}"
             return (f"{row.song} {dtag}", dtag, sfull)
@@ -207,7 +211,8 @@ class TableStats(TableStatsConstructing):
         return song_shorthand
 
     @cached_property
-    def combined(self):
+    def combined(self) -> pd.DataFrame:
+        """(key, steptype, difficulty) -> (pack, song, meter, playcount, lastplayed)"""
         assert self.playedsongs is not None
         assert self.availablesongs is not None
 
@@ -217,23 +222,10 @@ class TableStats(TableStatsConstructing):
         combined["playcount"] = combined["playcount"].fillna(0).astype(int)
 
         # sort index for aesthetics (e.g. difficulties show up in Easy, Medium, Hard, Challenge order)
-        def pdict(arr):
-            return {v: k for k, v in enumerate(arr)}
-
-        MODE = pdict(["dance-single", "dance-double", "pump-single", "pump-double"])
-        DIFFS = pdict(["Beginner", "Easy", "Medium", "Hard", "Challenge"])
-
-        def sorter_difficulty_spread(s):
-            if s.name == "steptype":
-                return s.map(lambda x: MODE.get(x, len(MODE)))
-            elif s.name == "difficulty":
-                return s.map(lambda x: DIFFS.get(x, len(DIFFS)))
-            return s
-
-        combined = combined.sort_index(key=sorter_difficulty_spread)
+        combined = combined.sort_index(key=constants.difficulty_spread_sorter)
 
         # compute pack name and song name for each row
-        def split_key(k):
+        def split_key(k: str) -> Tuple[str, str]:
             parts = k.strip("/").split("/")
             pack, *_, inferred_songname = parts
             return (pack, inferred_songname)
@@ -250,39 +242,13 @@ class TableStats(TableStatsConstructing):
         # update combined with the computed results
         combined = combined.assign(pack=v["pack"], song=v["song"])
 
-        # store the songname column for later, when calculating the pack_info dataframe
-        # drop it from the combined frame cause I don't want the data in this location
-        # songnames = combined['songname']
-        # combined = combined.drop(columns=['songname'])
-
-        # def inner_loop(row):
-        #     k = row.name[0]
-        #     parts = k.strip('/').split('/')
-        #     pack, *_, inferred_songname = parts
-        #     # if songname data doesn't exist, fall back to inferring the song name as the folder name
-        #     songname = row.songname
-        #     if row.songname is None:
-        #         songname = inferred_songname
-        #     return (pack, songname)
-
-        # pack_info = combined.apply(inner_loop, axis=1, result_type='expand').rename(columns=dict(enumerate(['pack', 'song'])))
-        # pack_info
-
-        # # compute packinfo
-        # data = []
-        # for k,songname in songnames.groupby('key').first().items():
-
-        # self.packinfo = pd.DataFrame(data, columns=['key', 'pack', 'song']).set_index(['key'])
-
-        # There can be songs that have been played but aren't available anymore, e.g. removed packs, USB customs.
-        # Leaving these in the combined table can mess up certain queries like chart count and pack completion.
-        # Here we'll leave only songs that are available.
-        # Note that this also removes the @mem pack
-        # TODO: this should be specified within queries, probably
-
         return combined
 
-    def song_data(self, keep_unavailable: bool = True, with_mem: bool = False):
+    def song_data(self, keep_unavailable: bool = True, with_mem: bool = False) -> pd.DataFrame:
+        """
+        Grab song list data.
+        (key, steptype, difficulty) -> (pack, song, meter, playcount, lastplayed)
+        """
         df = self.combined
         if not with_mem:
             df = df[df.pack != "@mem"]
@@ -290,7 +256,16 @@ class TableStats(TableStatsConstructing):
             df = df[df.index.isin(self.availablesongs.index)]
         return df
 
-    def leaderboards(self, keep_unavailable: bool = True, with_mem: bool = False, with_ddr: bool = True):
+    def leaderboards(
+        self, keep_unavailable: bool = True, with_mem: bool = False, with_ddr: bool = True
+    ) -> pd.DataFrame:
+        """
+        Grab leaderboard data.
+        (key, steptype, difficulty) -> (place, player, score, timestamp)
+            - place: place in leaderboard, 1 (1st), 4 (4th), 8 (8th), etc.
+            - player: 4 character leaderboard name
+            - score: number between 0 and 1
+        """
         df = self.highscores
 
         # join pack column so we can filter on it, drop it later
@@ -305,5 +280,9 @@ class TableStats(TableStatsConstructing):
         return df.drop("pack", axis="columns")
 
     @cached_property
-    def pack_info(self):
+    def pack_info(self) -> pd.DataFrame:
+        """
+        Lookup table from song key -> pack name and song title.
+        (key) -> (pack, song)
+        """
         return self.combined.groupby("key").nth(0).reset_index(level=[1, 2])[["pack", "song"]]

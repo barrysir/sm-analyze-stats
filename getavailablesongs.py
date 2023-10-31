@@ -1,22 +1,25 @@
 # Survey a Stepmania Songs folder and output song information to a csv
 # to be loaded by data analysis for better output.
 
-from typing import Iterator, List, Optional, Tuple
-from simfile.dir import SimfileDirectory
-import simfile
-from pathlib import Path
-import time
-import csv
 import argparse
+import csv
+import time
+from pathlib import Path
+from typing import Iterator, List, Optional, Tuple
+
+import simfile
+from simfile.dir import SimfileDirectory
 
 
 def loadfromcsv(path: Path) -> List[List[str]]:
+    """Load data from CSV as array"""
     with open(path, newline="", encoding="utf8") as csvfile:
         reader = csv.reader(csvfile, delimiter=",", quotechar='"')
         return [row for row in reader]
 
 
 def writetocsv(path: Path, data: List[List]) -> None:
+    """Write array to CSV"""
     with open(path, "w", newline="", encoding="utf8") as csvfile:
         writer = csv.writer(csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
         for item in data:
@@ -51,7 +54,7 @@ def pack_iterator(song_folder: Path) -> List[Path]:
 def song_iterator(pack_folder: Path, secrets: bool = False) -> Iterator[Tuple[Path, Path]]:
     """Return paths to each song in a pack folder"""
     if secrets:
-        raise NotImplemented("secrets flag not implemented yet")
+        raise NotImplementedError("secrets flag not implemented yet")
 
     for songpath in sorted(directories(pack_folder), key=lambda p: p.stem.lower()):
         d = SimfileDirectory(songpath)
@@ -101,9 +104,8 @@ if __name__ == "__main__":
     start = lastwrite = time.monotonic()
 
     try:
-
         def pack_listing(songs_folder: Path, pack_filter: List[str], skip_to_pack: Optional[str]) -> Iterator[Path]:
-            """Iterator of packs to scan based on command-line options."""
+            """Iterate over packs to scan based on command-line options."""
             if pack_filter is None:
                 allpacks = pack_iterator(songs_folder)
             else:
@@ -140,7 +142,7 @@ if __name__ == "__main__":
                     writetocsv(OUTPUT_PATH, availablesongs)
                     lastwrite = now
 
-                with open(smpath, "r", encoding="utf8", errors="ignore") as f:
+                with open(smpath, encoding="utf8", errors="ignore") as f:
                     # strict=False required to parse simfiles with text between msd tags (e.g. comments)
                     # eg. #TITLE:a;     text here
                     #     #SUBTITLE:b;
