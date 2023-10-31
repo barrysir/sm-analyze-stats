@@ -365,7 +365,7 @@ def song_grades_by_meter(
     return x.unstack()
 
 
-def highest_scores(stats: TableStats, with_ddr: bool, limit: int = 100) -> pd.DataFrame:
+def highest_scores(stats: TableStats, with_ddr: bool, limit: int = 100, modes: Optional[list] = None) -> pd.DataFrame:
     """
     Return top N highest scores. Ties are sorted by meter descending.
 
@@ -373,10 +373,14 @@ def highest_scores(stats: TableStats, with_ddr: bool, limit: int = 100) -> pd.Da
     sorted by (score, meter) descending
 
     with_ddr - exclude DDR songs, since their metering system is different
+    modes - filter to only scores on these modes (e.g. only doubles scores)
     """
+    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr)
+    if modes:
+        leaderboards = leaderboards.loc[pd.IndexSlice[:, modes, :]]
+
     leaderboards = (
-        stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr)
-        .join(stats.song_data(with_mem=False, keep_unavailable=False))
+        leaderboards.join(stats.song_data(with_mem=False, keep_unavailable=False))
         .join(stats.song_shorthand["stepfull"])
         .sort_values(by=["score", "meter"], ascending=False)
     )
@@ -385,7 +389,9 @@ def highest_scores(stats: TableStats, with_ddr: bool, limit: int = 100) -> pd.Da
     ]
 
 
-def highest_passes(stats: TableStats, with_ddr: bool, max_diff: int = 27, limit: int = 100) -> pd.DataFrame:
+def highest_passes(
+    stats: TableStats, with_ddr: bool, max_diff: int = 27, limit: int = 100, modes: Optional[list] = None
+) -> pd.DataFrame:
     """
     Return top N highest block passes. Ties are sorted by score descending.
 
@@ -393,11 +399,15 @@ def highest_passes(stats: TableStats, with_ddr: bool, max_diff: int = 27, limit:
     sorted by (meter, score) descending
 
     with_ddr - exclude DDR songs, since their metering system is different
-    max_diff - required to exclude passes on joke difficulties, e.g. 69.
+    max_diff - required to exclude passes on joke difficulties, e.g. 69
+    modes - filter to only scores on these modes (e.g. only doubles scores)
     """
+    leaderboards = stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr)
+    if modes:
+        leaderboards = leaderboards.loc[pd.IndexSlice[:, modes, :]]
+
     leaderboards = (
-        stats.leaderboards(with_mem=False, keep_unavailable=False, with_ddr=with_ddr)
-        .join(stats.song_data(with_mem=False, keep_unavailable=False))
+        leaderboards.join(stats.song_data(with_mem=False, keep_unavailable=False))
         .join(stats.song_shorthand["stepfull"])
         .sort_values(by=["meter", "score"], ascending=False)
     )

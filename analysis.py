@@ -151,12 +151,14 @@ def create_highest_scores_sheet(ws: Worksheet, stats: TableStats) -> None:
     #   - highest scores (DDR only)
     # there are too many ways to slice the highscore data --
     # I think the only way to make it useful is to make it interactive
-    a = analyzers.song_grades_by_meter(stats, analyzers.GRADE_BY_10)
-    highest_scores = analyzers.highest_scores(stats, with_ddr=False)
-    highest_passes = analyzers.highest_passes(stats, with_ddr=False)
+    highest_scores_singles = analyzers.highest_scores(stats, with_ddr=False, modes=["dance-single"])
+    highest_passes_singles = analyzers.highest_passes(stats, with_ddr=False, modes=["dance-single"])
 
-    write_table(a.reset_index(), ws["S2"])
-    write_table(highest_scores, ws["A29"])
-    write_table(highest_passes, ws["J29"])
+    write_table(highest_scores_singles, ws["A3"])
+    write_table(highest_passes_singles, ws["J3"])
 
-    # todo: doubles sheet
+    highest_scores_doubles = analyzers.highest_scores(stats, with_ddr=False, modes=["dance-double"])
+    highest_passes_doubles = analyzers.highest_passes(stats, with_ddr=False, modes=["dance-double"])
+
+    write_table(highest_scores_doubles, ws["A106"])
+    write_table(highest_passes_doubles, ws["J106"])
