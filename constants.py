@@ -4,7 +4,7 @@ I'll refactor this once it receives more use and I figure out what to do with it
 """
 
 from collections import OrderedDict, namedtuple
-from typing import Iterable
+from collections.abc import Iterable
 
 import pandas as pd
 

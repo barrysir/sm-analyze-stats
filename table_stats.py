@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from pathlib import Path
-from typing import Optional, Set, Tuple
+from typing import Optional
 
 import pandas as pd
 
@@ -18,7 +18,7 @@ class TableStatsConstructing:
     def fill_stats_xml(
         self,
         path_to_stats: Path,
-        packs_to_ignore: Optional[Set[str]] = None,
+        packs_to_ignore: Optional[set[str]] = None,
         track_usb_customs: bool = False,
         track_slowed_down_plays: bool = False,
     ) -> None:
@@ -130,7 +130,7 @@ class TableStatsConstructing:
         self.playedsongs = df_playdata
         self.highscores = df_leaderboards
 
-    def fill_song_listing(self, path_to_csv: Path, packs_to_ignore: Optional[Set[str]] = None) -> None:
+    def fill_song_listing(self, path_to_csv: Path, packs_to_ignore: Optional[set[str]] = None) -> None:
         """Load data from the song listing data file."""
 
         def loadfromcsv(path: Path) -> list:
@@ -225,7 +225,7 @@ class TableStats(TableStatsConstructing):
         combined = combined.sort_index(key=constants.difficulty_spread_sorter)
 
         # compute pack name and song name for each row
-        def split_key(k: str) -> Tuple[str, str]:
+        def split_key(k: str) -> tuple[str, str]:
             parts = k.strip("/").split("/")
             pack, *_, inferred_songname = parts
             return (pack, inferred_songname)

@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 import pandas as pd
 from openpyxl.cell import Cell
@@ -76,7 +76,7 @@ def write_row(row: list, cell: Cell) -> None:
 # ---------------------------------------------
 
 
-def create_general_sheet(ws: Worksheet, stats: TableStats, mode_labels: Optional[Dict[str, str]] = None) -> None:
+def create_general_sheet(ws: Worksheet, stats: TableStats, mode_labels: Optional[dict[str, str]] = None) -> None:
     """Create General sheet"""
     if mode_labels is None:
         mode_labels = {"dance-single": "Singles", "dance-double": "Doubles"}

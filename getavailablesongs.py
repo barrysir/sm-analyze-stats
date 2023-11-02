@@ -4,21 +4,22 @@
 import argparse
 import csv
 import time
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple
+from typing import Optional
 
 import simfile
 from simfile.dir import SimfileDirectory
 
 
-def loadfromcsv(path: Path) -> List[List[str]]:
+def loadfromcsv(path: Path) -> list[list[str]]:
     """Load data from CSV as array"""
     with open(path, newline="", encoding="utf8") as csvfile:
         reader = csv.reader(csvfile, delimiter=",", quotechar='"')
         return [row for row in reader]
 
 
-def writetocsv(path: Path, data: List[List]) -> None:
+def writetocsv(path: Path, data: list[list]) -> None:
     """Write array to CSV"""
     with open(path, "w", newline="", encoding="utf8") as csvfile:
         writer = csv.writer(csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -26,7 +27,7 @@ def writetocsv(path: Path, data: List[List]) -> None:
             writer.writerow(item)
 
 
-def translit(normal: Optional[str], transliterated: Optional[str]) -> Tuple[str, str]:
+def translit(normal: Optional[str], transliterated: Optional[str]) -> tuple[str, str]:
     """
     Behaviour to compute real normal/translit values from those stored in the simfile.
     If one entry is empty, fills it with the other.
@@ -46,12 +47,12 @@ def directories(path: Path) -> Iterator[Path]:
     return (p for p in path.iterdir() if p.is_dir())
 
 
-def pack_iterator(song_folder: Path) -> List[Path]:
+def pack_iterator(song_folder: Path) -> list[Path]:
     """Return paths to each pack in a song folder"""
     return sorted(directories(song_folder), key=lambda p: p.stem.lower())
 
 
-def song_iterator(pack_folder: Path, secrets: bool = False) -> Iterator[Tuple[Path, Path]]:
+def song_iterator(pack_folder: Path, secrets: bool = False) -> Iterator[tuple[Path, Path]]:
     """Return paths to each song in a pack folder"""
     if secrets:
         raise NotImplementedError("secrets flag not implemented yet")
@@ -103,7 +104,7 @@ if __name__ == "__main__":
 
     start = lastwrite = time.monotonic()
 
-    def pack_listing(songs_folder: Path, pack_filter: List[str], skip_to_pack: Optional[str]) -> Iterator[Path]:
+    def pack_listing(songs_folder: Path, pack_filter: list[str], skip_to_pack: Optional[str]) -> Iterator[Path]:
         """Iterate over packs to scan based on command-line options."""
         if pack_filter is None:
             allpacks = pack_iterator(songs_folder)

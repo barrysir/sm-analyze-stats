@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ def chart_counts_for_each_pack(stats: TableStats, modes: dict[str, str]) -> pd.D
     def one_row_per_song(df: pd.DataFrame) -> pd.DataFrame:
         return df[~df.index.get_level_values("key").duplicated()]
 
-    def songs_and_charts(v: pd.DataFrame, column_prefix: str = "") -> Tuple[pd.Series, pd.Series]:
+    def songs_and_charts(v: pd.DataFrame, column_prefix: str = "") -> tuple[pd.Series, pd.Series]:
         """Count number of songs and number of charts in each pack"""
         if column_prefix != "":
             column_prefix = f"{column_prefix}_"
