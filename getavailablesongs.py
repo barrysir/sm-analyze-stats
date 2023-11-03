@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import simfile
-from simfile.dir import SimfileDirectory
+from simfile.dir import SimfileDirectory, DuplicateSimfileError
 
 
 def loadfromcsv(path: Path) -> list[list[str]]:
@@ -58,8 +58,19 @@ def song_iterator(pack_folder: Path, secrets: bool = False) -> Iterator[tuple[Pa
         raise NotImplementedError("secrets flag not implemented yet")
 
     for songpath in sorted(directories(pack_folder), key=lambda p: p.stem.lower()):
-        d = SimfileDirectory(songpath)
-        smpath = d.simfile_path
+        try:
+            # todo: when simfile library upgrades to 2.1.2+, use the ignore_duplicate flag
+            d = SimfileDirectory(songpath)
+            smpath = d.simfile_path
+        except DuplicateSimfileError:
+            available_sims = sorted(songpath.glob("*.ssc")) + sorted(songpath.glob("*.sm"))
+            # we should always have at least 2 simfiles since DuplicateSimfileError was raised, but...
+            if len(available_sims) == 0:
+                smpath = None
+            else:
+                smpath = available_sims[0]
+                print(f"{songpath} has duplicate simfiles. Choosing to parse {smpath}")
+        
         if smpath is None:
             # this song folder didn't contain a simfile, it's not a song
             # (eg. some packs have a folder to hold graphics)
