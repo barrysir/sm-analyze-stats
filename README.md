@@ -1,20 +1,38 @@
 # sm-analyze-stats
 
-Scripts to analyze a given Stepmania Stats.xml file for stats (most played songs, leaderboards, etc.)
+Script to analyze the saved statistics of a Stepmania instance (Stats.xml) and report statistics in an Excel spreadsheet. (This can then be imported into Google Sheets or wherever.)
 
-You can run this code but I don't really expect people to run it for themselves, it's more for people to look at and steal/reuse for their own analysis needs :) 
+The only user of this code currently is me so sorry if it's hard to use.
+
 
 ## How to use
 
-Standard Python business:
-  * Dependencies are in `requirements.txt`. Install with `pip install -r requirements.txt`.
-    * Optionally create a virtual environment before installing if you don't want to clutter your main Python installation. `python -m venv venv`
+### Installation
 
-The analysis uses your Stepmania `Stats.xml` file as well as a scan of your Stepmania songs folder (not required, but it greatly improves the quality of the output data.)
+Standard Python business:
+  * Python 3.9+
+  * Optionally create a virtual environment before installing if you don't want to clutter your main Python installation. `python -m venv venv` to create the environment, then `venv/Scripts/activate` (or wherever you activation script is) to enter it.
+  * Dependencies are in `pyproject.toml`. Install with `pip install .`
+  * The `pyproject.toml` also has optional dependencies listed for development and notebook libraries. To install these, e.g. the `notebook` optional dependencies, run `pip install .[notebook]`.
+    
+
+### Prerequisite data files
+
+The analysis uses your Stepmania `Stats.xml` file as well as a scan of your Stepmania songs folder. You can usually find this at `(your stepmania folder)/Save/MachineProfile/Stats.xml`.
 
 To scan your Stepmania folder use the `getavailablesongs.py` script (usage: `getavailablesongs.py (path to your songs folder)`). After iterating through your song folder for a while, it will generate a CSV file which the data analysis knows to look for and read.
 
-The data analysis is done in a Jupyter notebook. There's a preamble to load in required data, then the code to generate each data table appears in its own section. Run the preamble then run each tables' section one-by-one. Each section is structured to write the data to your clipboard, which you can then paste into Excel or Google Sheets or wherever you want.
+### Generating the report
+
+The main script is `py main.py`. Provide the data files as command-line arguments. Please view its help page for information on how to use it. By default it will write the finished report to `output.xlsx` (configurable by a command line parameter).
+
+### Optional: Jupyter notebook
+
+A Jupyter notebook (after installing Jupyter, run `jupyter notebook`) is also provided with sections to generate each table individually. You can use this notebook to do your own analysis. More information is written in the notebook.
+
+## Development notes
+
+Using `ruff` for code linting. `ruff format .` -> `ruff check .`.
 
 ## Available statistics
 
@@ -41,5 +59,3 @@ The data analysis is done in a Jupyter notebook. There's a preamble to load in r
  * Highest scores
    * singles
    * doubles
- * Leaderboard analysis
-   * Number of 1st places, 2nd places, etc. of each player

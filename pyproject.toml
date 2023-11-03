@@ -1,0 +1,46 @@
+[project]
+name = "sm-analyze-stats"
+version = "0.1"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas==2.0.1",
+    "simfile==2.1.1",
+    "openpyxl==3.1.2",
+]
+
+[project.optional-dependencies]
+notebook = ["notebook==6.5.4"]
+dev = ["ruff==0.1.2"]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # type annotations
+    "ANN",
+    # docstrings
+    "D",
+]
+ignore = [
+    "ANN101",   # Missing type annotation for `self` in method
+    "D203",     # 1 blank line required before class docstring, in favour of no blank line (D211)
+    "D212",     # Multi-line docstring summary should start at the first line, in favour of D213 (start at second line)
+
+    # various documentation formatting I don't agree with
+    "D400", "D415", "D205",
+    "D100",     # Missing docstring in public module
+]
